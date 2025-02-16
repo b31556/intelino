@@ -61,8 +61,8 @@ pip install -r requirements.txt
 
 2. **Color Marking System**  
    ```plaintext
-   Switch Format: [Primary Color],[Secondary Color],[Cyan Marker]
-   Crossing Format: [Any Color],[Red],[Marker Color]
+   Switch Format: [Cyan],[Red / Blue],[Unique color]
+   Crossing Format: [White],[Cross`s unique color],[White]
    ```
    ![Crossing Example](https://github.com/user-attachments/assets/f3e1c367-e6e8-40c7-9222-31b1da303190)
 
