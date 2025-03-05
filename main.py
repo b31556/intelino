@@ -19,6 +19,8 @@ trainc={}
 
 zones={}
 
+alreed={}
+
 MAP={}
 
 danger_zones={}
@@ -153,10 +155,11 @@ def makedecision(train,colors):
 
 
 def detect(train, msg):
-    global trainc, MAP, trains_last
+    global trainc, MAP, trains_last,alreed
     if msg.color==C.BLACK:
         if train in trainc.keys():
             if trainc[train]==["M"]:
+                alreed[train]=True
                 command(train,find_next(trains_last[train]))
             del trainc[train]
         return
@@ -168,6 +171,9 @@ def detect(train, msg):
             return
     
     if len(trainc[train]) >=3:
+        if train in alreed:
+            del alreed[train]
+            return
         command(train, trainc[train])
 
 def command(train: Train, colors: list):
@@ -243,7 +249,7 @@ def main():
     global trains
     global train_in_danger_zone
 
-    train_count = 2
+    train_count = 1
     blink_delay = 0.5  # in seconds
 
     print("scanning and connecting...")

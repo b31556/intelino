@@ -10,6 +10,7 @@ import random
 import time
 import json
 
+
 map={}
 
 timetable={}
@@ -23,6 +24,22 @@ form_time=None
 trainc={}
 
 autoincrecemt=0
+
+irany=0
+
+class titokmappa:
+    def __init__(self):
+        self.bank={} # {(to,from)}
+    def i_arrived(self,fro: tuple[str,str,str],to: tuple[str,str]):
+        for key in self.bank:
+            if (self.bank[key][0],self.bank[key][1])==to:
+                if (key[0],key[1]) == to:
+                    return key[2]
+        self.bank[fro] = to
+
+titkokmappaja=titokmappa()
+
+
 
 def checkdone():
     global map
@@ -67,16 +84,35 @@ def detect(train, msg):
         command(train, trainc[train])
 
 def command(train, colors):
-    global map,valtok,currentzone_beggining,form_time,autoincrecemt,timetable
-    
+    global map,valtok,currentzone_beggining,form_time,autoincrecemt,timetable, irany
+
+    with open("map.json","w") as f:
+        toprintmap={}
+        for key in map:
+            if key[2] == "?":
+                pass
+            else:
+                prepkey=""
+                for i in range(len(key)):
+                    prepkey += str(key[i])
+                toprintmap[prepkey]=map[key]
+        json.dump(toprintmap,f)
+    with open("timetable.json","w") as f:
+        json.dump(timetable,f)
+
     if colors[2] == 'C':
         if currentzone_beggining:
             if (colors[1],colors[0]) == (currentzone_beggining[0],currentzone_beggining[1]):
                 map[(colors[1],colors[0],0)]=autoincrecemt
                 map[(colors[1],colors[0],1)]=autoincrecemt
-            map[currentzone_beggining]=autoincrecemt
-            if not( (colors[1],colors[0],0) in map or (colors[1],colors[0],1) in map ):
-                map[(colors[1],colors[0],"?")] =autoincrecemt
+            
+            # {(to1,to2) : (from1,from2,from3)}
+            okt = titkokmappaja.i_arrived(currentzone_beggining,(colors[1],colors[0]))
+            if okt:
+                map[(colors[1],colors[0],okt)]=autoincrecemt
+                map[currentzone_beggining]=autoincrecemt
+
+
             timetable[autoincrecemt] = time.time()-form_time
             autoincrecemt+=1
             if not (colors[1],colors[0]) in valtok:
@@ -92,7 +128,7 @@ def command(train, colors):
                             prepkey=""
                             for i in range(len(key)):
                                prepkey += str(key[i])
-                            toprintmap[key]=map[key]
+                            toprintmap[prepkey]=map[key]
                     json.dump(toprintmap,f)
                 with open("timetable.json","w") as f:
                     json.dump(timetable,f)
@@ -103,6 +139,10 @@ def command(train, colors):
         
         currentzone_beggining=(colors[1],colors[0],"-")
         form_time=time.time()
+        ch=random.randint(0,1)
+        irany=ch
+        train.set_next_split_steering_decision(SteeringDecision.LEFT if ch==0 else SteeringDecision.RIGHT)
+        
         
     if colors[0] == 'C':
         if currentzone_beggining:
@@ -123,7 +163,7 @@ def command(train, colors):
                             prepkey=""
                             for i in range(len(key)):
                                prepkey += str(key[i])
-                            toprintmap[key]=prepkey
+                            toprintmap[prepkey]=map[key]
                     json.dump(toprintmap,f)
                 with open("timetable.json","w") as f:
                     json.dump(timetable,f)
@@ -141,10 +181,9 @@ def command(train, colors):
             ch=random.choice((0,1))
 
 
-        currentzone_beggining=(colors[1],colors[2],ch)
+        currentzone_beggining=(colors[1],colors[2],irany)
         form_time=time.time()
 
-        train.set_next_split_steering_decision(SteeringDecision.LEFT if ch==0 else SteeringDecision.RIGHT)
         
     
 
@@ -152,7 +191,7 @@ def main():
     train= TrainScanner().get_train()
     train.add_front_color_change_listener(detect)
     train.set_snap_command_execution(False)
-    train.drive_at_speed(60)
+    train.drive_at_speed(40)
     print("connected! ")
         
 
