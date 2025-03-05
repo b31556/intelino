@@ -20,6 +20,8 @@ currentzone_beggining=None
 
 form_time=None
 
+trainc={}
+
 autoincrecemt=0
 
 def checkdone():
@@ -48,6 +50,7 @@ def col(color):
         return "C"
 
 def detect(train, msg):
+    print("color!")
     global trainc
     if msg.color==C.BLACK:
         if train in trainc.keys():
@@ -68,6 +71,9 @@ def command(train, colors):
     
     if colors[2] == 'C':
         if currentzone_beggining:
+            if (colors[1],colors[0]) == (currentzone_beggining[0],currentzone_beggining[1]):
+                map[(colors[1],colors[0],0)]=autoincrecemt
+                map[(colors[1],colors[0],1)]=autoincrecemt
             map[currentzone_beggining]=autoincrecemt
             if not( (colors[1],colors[0],0) in map or (colors[1],colors[0],1) in map ):
                 map[(colors[1],colors[0],"?")] =autoincrecemt
@@ -78,7 +84,16 @@ def command(train, colors):
             if checkdone():
                 print("Done!")
                 with open("map.json","w") as f:
-                    json.dump(map,f)
+                    toprintmap={}
+                    for key in map:
+                        if key[2] == "?":
+                            pass
+                        else:
+                            prepkey=""
+                            for i in range(len(key)):
+                               prepkey += str(key[i])
+                            toprintmap[key]=map[key]
+                    json.dump(toprintmap,f)
                 with open("timetable.json","w") as f:
                     json.dump(timetable,f)
                 time.sleep(1)
@@ -100,21 +115,31 @@ def command(train, colors):
             if checkdone():
                 print("Done!")
                 with open("map.json","w") as f:
-                    json.dump(map,f)
+                    toprintmap={}
+                    for key in map:
+                        if key[2] == "?":
+                            pass
+                        else:
+                            prepkey=""
+                            for i in range(len(key)):
+                               prepkey += str(key[i])
+                            toprintmap[key]=prepkey
+                    json.dump(toprintmap,f)
                 with open("timetable.json","w") as f:
                     json.dump(timetable,f)
                 time.sleep(1)
                 train.stop_driving()
                 exit()
         
-        ch=[]
+        
 
         if not (colors[1],colors[2],0) in map:
-            ch.append(0)
+            ch=0
         elif not (colors[1],colors[2],1) in map:
-            ch.append(1)
+            ch=1
         else:
-            ch.append(random.choice((0,1)))
+            ch=random.choice((0,1))
+
 
         currentzone_beggining=(colors[1],colors[2],ch)
         form_time=time.time()
@@ -124,10 +149,11 @@ def command(train, colors):
     
 
 def main():
-    with TrainScanner() as train:
-        train.add_front_color_change_listener(detect)
-        train.set_snap_command_execution(False)
-        train.drive_at_speed(60)
+    train= TrainScanner().get_train()
+    train.add_front_color_change_listener(detect)
+    train.set_snap_command_execution(False)
+    train.drive_at_speed(60)
+    print("connected! ")
         
 
         

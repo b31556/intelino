@@ -24,31 +24,21 @@ MAP={}
 danger_zones={}
 danger_zones_trains_waiting={}
 
+trains_last={}
+
 data = {
-    ("B", "W", 0): 0,
-    ("B", "W", 1): 1,
-    ("R", "B", 0): 1,
-    ("R", "B", 1): 9,
-    ("B", "R", 1): 0,
-    ("B", "R", 0): 2,
-    ("R", "Y", 0): 2,
-    ("R", "Y", 1): 3,
-    ("B", "Y", 0): 3,
-    ("B", "Y", 1): 4,
-    ("B", "G", 1): 4,
-    ("B", "G", 0): 5,
-    ("R", "M", 0): 5,
-    ("R", "M", 1): 6,
-    ("R", "M", "-"): 10,
-    ("B", "Y", "-"): 10,
-    ("R", "Y", "-"): 11,
-    ("R", "B", "-"): 11,
-    ("B", "M", 1): 6,
-    ("B", "M", 0): 7,
-    ("B", "W", "-"): 7,
-    ("B", "M", "-"): 8,
-    ("B", "R", "-"): 8,
-    ("B", "G", "-"): 9
+    ("R","M",0): 0,
+    ("R","M",1): 1,
+    ("B","G",0): 1,
+    ("B","G",1): 0,
+    ("B","W","-"): 2,
+    ("R","M","-"): 2,
+    ("B","G","-"): 3,
+    ("B","W",0): 3,
+    ("B","W",1): 4,
+    ("B","Y","-"): 4,
+    ("B","Y",0): 5,
+    ("B","Y",1): 5,
 }
 
 def col(color):
@@ -67,14 +57,19 @@ def col(color):
     elif color == C.CYAN:
         return "C"
 
-def check_ultimake_danger(colors):
-    global MAP
+def find_next(colors):
     intakes=[]
     for ctrl in data:
         if data[ctrl] == data[colors]:
             intakes.append(ctrl)
     intakes.remove(colors)
     next_valto = intakes[0]
+    return next_valto
+
+
+def check_ultimake_danger(colors):
+    global MAP
+    next_valto = find_next(colors)
     if next_valto[2] == "-":
         if not((next_valto[0],next_valto[1],0) in MAP) and not((next_valto[0],next_valto[1],1) in MAP):
             return True
@@ -158,9 +153,11 @@ def makedecision(train,colors):
 
 
 def detect(train, msg):
-    global trainc
+    global trainc, MAP, trains_last
     if msg.color==C.BLACK:
         if train in trainc.keys():
+            if trainc[train]==["M"]:
+                command(train,find_next(trains_last[train]))
             del trainc[train]
         return
     else:
@@ -179,6 +176,7 @@ def command(train: Train, colors: list):
     global zones
     global danger_zones
     global danger_zones_trains_waiting
+    global trains_last
     print(colors)
 
     if colors[0] == 'W' and colors[2] == 'W':
@@ -213,6 +211,8 @@ def command(train: Train, colors: list):
             train.stop_driving()
         print("train in zone ", data[(colors[1],colors[0],"-")])
         MAP[data[(colors[1],colors[0],"-")]] = train
+        trains_last[train] = (colors[1],colors[0],"-")
+
 
     if colors[0] == 'C':
         todel=[]
@@ -234,6 +234,8 @@ def command(train: Train, colors: list):
         
         train.set_next_split_steering_decision(SteeringDecision.LEFT if ch == 0 else SteeringDecision.RIGHT)
         print("left" if ch == 0 else "right")
+
+        trains_last[train] = (colors[1],colors[2],ch)
 
     
 
