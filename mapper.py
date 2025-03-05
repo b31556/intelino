@@ -32,8 +32,8 @@ class titokmappa:
         self.bank={} # {(to,from)}
     def i_arrived(self,fro: tuple[str,str,str],to: tuple[str,str]):
         for key in self.bank:
-            if (self.bank[key][0],self.bank[key][1])==to:
-                if (key[0],key[1]) == to:
+            if (key[0],key[1])==to:
+                if self.bank[key] == (fro[0],fro[1]):
                     return key[2]
         self.bank[fro] = to
 
@@ -141,6 +141,7 @@ def command(train, colors):
         form_time=time.time()
         ch=random.randint(0,1)
         irany=ch
+        print(irany)
         train.set_next_split_steering_decision(SteeringDecision.LEFT if ch==0 else SteeringDecision.RIGHT)
         
         
