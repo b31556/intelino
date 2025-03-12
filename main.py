@@ -1,7 +1,7 @@
 
 # please visit the github page if you dont know how to use it  https://github.com/b31556/intelino
 
-
+import json
 import random
 import time
 from intelino.trainlib import TrainScanner, Train
@@ -21,6 +21,8 @@ zones={}
 
 alreed={}
 
+alterata={}
+
 MAP={}
 
 danger_zones={}
@@ -28,20 +30,16 @@ danger_zones_trains_waiting={}
 
 trains_last={}
 
-data = {
-    ("R","M",0): 0,
-    ("R","M",1): 1,
-    ("B","G",0): 1,
-    ("B","G",1): 0,
-    ("B","W","-"): 2,
-    ("R","M","-"): 2,
-    ("B","G","-"): 3,
-    ("B","W",0): 3,
-    ("B","W",1): 4,
-    ("B","Y","-"): 4,
-    ("B","Y",0): 5,
-    ("B","Y",1): 5,
-}
+data={}
+
+
+with open("map.json","r") as f:
+    idi = json.load(f)
+    for zone in idi:
+        data[(zone[0],zone[1],zone[2])] = idi[zone]
+
+print(data)
+        
 
 def col(color):
     if color == C.GREEN:
@@ -73,7 +71,7 @@ def check_ultimake_danger(colors):
     global MAP
     next_valto = find_next(colors)
     if next_valto[2] == "-":
-        if not((next_valto[0],next_valto[1],0) in MAP) and not((next_valto[0],next_valto[1],1) in MAP):
+        if not((next_valto[0],next_valto[1],'0') in MAP) and not((next_valto[0],next_valto[1],'1') in MAP):
             return True
         else:
             return False
@@ -97,7 +95,7 @@ def mark_path(train, colors, isstart=False):
     intakes.remove(colors)
     next_valto = intakes[0]
     if next_valto[2] == "-":
-        if not((next_valto[0],next_valto[1],0) in MAP) and not((next_valto[0],next_valto[1],1) in MAP):
+        if not((next_valto[0],next_valto[1],'0') in MAP) and not((next_valto[0],next_valto[1],'1') in MAP):
             return True
         else:
             return False
@@ -114,17 +112,17 @@ def makedecision(train,colors):
     global data
     "returns 0 for left and 1 for right"
     posibilities=[]
-    if not data[(colors[1],colors[2],0)] in MAP:
-        if check_ultimake_danger((colors[1],colors[2],0)):
-            posibilities.append(0)
+    if not data[(colors[1],colors[2],'0')] in MAP:
+        if check_ultimake_danger((colors[1],colors[2],'0')):
+            posibilities.append('0')
 
         
                 
 
 
-    if not data[(colors[1],colors[2],1)] in MAP:
-        if check_ultimake_danger((colors[1],colors[2],1)):
-            posibilities.append(1)
+    if not data[(colors[1],colors[2],'1')] in MAP:
+        if check_ultimake_danger((colors[1],colors[2],'1')):
+            posibilities.append('1')
         
 
     if len(posibilities) == 0:
@@ -160,7 +158,17 @@ def detect(train, msg):
         if train in trainc.keys():
             if trainc[train]==["M"]:
                 alreed[train]=True
-                command(train,find_next(trains_last[train]))
+                for mop in MAP:
+                    if MAP[mop] == train:
+                        todel=mop
+                if not todel == False:
+                    del MAP[todel]
+                act=find_next(trains_last[train])
+                ch=makedecision(train,('C',act[0],act[1]))
+                print(ch)
+                train.set_next_split_steering_decision(SteeringDecision.LEFT if ch == 0 else SteeringDecision.RIGHT)
+                print("left" if ch == 0 else "right")
+                MAP[todel]=train
             del trainc[train]
         return
     else:
@@ -190,7 +198,7 @@ def command(train: Train, colors: list):
             if danger_zones[colors[1]] == train:
                 del danger_zones[colors[1]]
                 try:
-                    tostarttrain=danger_zones_trains_waiting[colors[1]].pop(0)
+                    tostarttrain=danger_zones_trains_waiting[colors[1]].pop('0')
                     tostarttrain.drive_at_speed(50)
                     danger_zones[colors[1]] = tostarttrain
                 except:
@@ -262,6 +270,8 @@ def main():
         #t.drive_at_speed(random.randint(30,60))
         t.add_front_color_change_listener(detect)
         t.set_snap_command_execution(False)
+        t.set_snap_command_feedback(False,False)
+        
         trains[t.id]=t
         
     

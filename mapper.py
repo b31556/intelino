@@ -30,7 +30,7 @@ irany=0
 class titokmappa:
     def __init__(self):
         self.bank={} # {(to,from)}
-    def i_arrived(self,fro: tuple[str,str,str],to: tuple[str,str]):
+    def i_arrived(self,fro,to):
         for key in self.bank:
             if (key[0],key[1])==to:
                 if self.bank[key] == (fro[0],fro[1]):
@@ -67,8 +67,17 @@ def col(color):
         return "C"
 
 def detect(train, msg):
-    print("color!")
+
     global trainc
+    if msg.color==C.MAGENTA:
+        if not(train in trainc.keys()):
+            global irany
+            irany=random.randint(0,1)
+
+            print(irany)
+            train.set_next_split_steering_decision(SteeringDecision.LEFT if irany==0 else SteeringDecision.RIGHT)
+
+
     if msg.color==C.BLACK:
         if train in trainc.keys():
             del trainc[train]
@@ -84,8 +93,9 @@ def detect(train, msg):
         command(train, trainc[train])
 
 def command(train, colors):
+    
     global map,valtok,currentzone_beggining,form_time,autoincrecemt,timetable, irany
-
+    print(currentzone_beggining)
     with open("map.json","w") as f:
         toprintmap={}
         for key in map:
@@ -108,7 +118,7 @@ def command(train, colors):
             
             # {(to1,to2) : (from1,from2,from3)}
             okt = titkokmappaja.i_arrived(currentzone_beggining,(colors[1],colors[0]))
-            if okt:
+            if okt != None:
                 map[(colors[1],colors[0],okt)]=autoincrecemt
                 map[currentzone_beggining]=autoincrecemt
 
