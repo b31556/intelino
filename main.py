@@ -21,8 +21,6 @@ zones={}
 
 alreed={}
 
-alterata={}
-
 MAP={}
 
 danger_zones={}
@@ -31,6 +29,9 @@ danger_zones_trains_waiting={}
 trains_last={}
 
 data={}
+
+with open("timetable.json") as f:
+    timetable = json.load(f)
 
 
 with open("map.json","r") as f:
@@ -67,7 +68,7 @@ def find_next(colors):
     return next_valto
 
 
-def check_ultimake_danger(colors):
+def check_ultimake_danger(colors,attime=time.time()):
     global MAP
     next_valto = find_next(colors)
     if next_valto[2] == "-":
@@ -82,7 +83,7 @@ def check_ultimake_danger(colors):
             return False
 
 
-def mark_path(train, colors, isstart=False):
+def mark_path(train, colors, isstart=False,attime=time.time()):
     global MAP
     
     if not isstart:
@@ -114,7 +115,7 @@ def makedecision(train,colors):
     posibilities=[]
     if not data[(colors[1],colors[2],'0')] in MAP:
         if check_ultimake_danger((colors[1],colors[2],'0')):
-            posibilities.append('0')
+            posibilities.append(0)
 
         
                 
@@ -122,7 +123,7 @@ def makedecision(train,colors):
 
     if not data[(colors[1],colors[2],'1')] in MAP:
         if check_ultimake_danger((colors[1],colors[2],'1')):
-            posibilities.append('1')
+            posibilities.append(1)
         
 
     if len(posibilities) == 0:
@@ -158,11 +159,12 @@ def detect(train, msg):
         if train in trainc.keys():
             if trainc[train]==["M"]:
                 alreed[train]=True
+                todel=[]
                 for mop in MAP:
                     if MAP[mop] == train:
-                        todel=mop
-                if not todel == False:
-                    del MAP[todel]
+                        todel.append(mop)
+                for ot in todel:
+                    del MAP[ot]
                 act=find_next(trains_last[train])
                 ch=makedecision(train,('C',act[0],act[1]))
                 print(ch)
@@ -198,7 +200,7 @@ def command(train: Train, colors: list):
             if danger_zones[colors[1]] == train:
                 del danger_zones[colors[1]]
                 try:
-                    tostarttrain=danger_zones_trains_waiting[colors[1]].pop('0')
+                    tostarttrain=danger_zones_trains_waiting[colors[1]].pop(0)
                     tostarttrain.drive_at_speed(50)
                     danger_zones[colors[1]] = tostarttrain
                 except:
@@ -214,12 +216,12 @@ def command(train: Train, colors: list):
 
 
     if colors[2] == 'C':
-        todel=False
+        todel=[]
         for mop in MAP:
             if MAP[mop] == train:
-                todel=mop
-        if not todel == False:
-            del MAP[todel]
+                todel.append(mop)
+        for ot in todel:
+            del MAP[ot]
         
         if data[(colors[1],colors[0],"-")] in MAP:
             train.stop_driving()
