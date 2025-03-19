@@ -70,8 +70,7 @@ class Map:
 
     def mark_track(self,train,switch,direction):
         switch=map.get(switch)
-        switch.tracks[d irection].mark(train)
-
+        switch.get_track(direction).train = train
         
     def _see_part(self,train,track: Track,come_from_sw,ttime):
         if track.is_free_at(ttime):
