@@ -4,12 +4,15 @@
 from intelino.trainlib import TrainScanner
 from intelino.trainlib.enums import (
     SnapColorValue as C,
-    SteeringDecision
+    SteeringDecision,
+    MovementDirection
 )
 import random
 import time
 import json
 
+reqdirch=False
+reqdirchdone=True
 
 map={}
 
@@ -31,11 +34,16 @@ class titokmappa:
     def __init__(self):
         self.bank={} # {(to,from)}
     def i_arrived(self,fro,to):
+        
         for key in self.bank:
             if (key[0],key[1])==to:
                 if self.bank[key] == (fro[0],fro[1]):
                     return key[2]
+        
         self.bank[fro] = to
+        with open("bank.json","w") as f:
+            for key in self.bank:
+                f.write(str(key)+" : "+str(self.bank[key]) + "\n")
 
 titkokmappaja=titokmappa()
 
@@ -93,8 +101,10 @@ def detect(train, msg):
         command(train, trainc[train])
 
 def command(train, colors):
-    
-    global map,valtok,currentzone_beggining,form_time,autoincrecemt,timetable, irany
+    global map,valtok,currentzone_beggining,form_time,autoincrecemt,timetable, irany,reqdirch,reqdirchdone
+
+    if not reqdirchdone:
+        return
     print(currentzone_beggining)
     with open("map.json","w") as f:
         toprintmap={}
@@ -146,14 +156,15 @@ def command(train, colors):
                 train.stop_driving()
                 exit()
 
-        
-        currentzone_beggining=(colors[1],colors[0],"-")
+       
         form_time=time.time()
         ch=random.randint(0,1)
         irany=ch
         print(irany)
         train.set_next_split_steering_decision(SteeringDecision.LEFT if ch==0 else SteeringDecision.RIGHT)
-        
+      
+        currentzone_beggining=(colors[1],colors[0],"-")
+
         
     if colors[0] == 'C':
         if currentzone_beggining:
@@ -190,9 +201,8 @@ def command(train, colors):
             ch=1
         else:
             ch=random.choice((0,1))
-
-
         currentzone_beggining=(colors[1],colors[2],irany)
+
         form_time=time.time()
 
         
@@ -204,6 +214,10 @@ def main():
     train.set_snap_command_execution(False)
     train.drive_at_speed(40)
     print("connected! ")
+    while True:
+        input("press enter to change direction")
+        global reqdirch
+        reqdirch=True
         
 
         

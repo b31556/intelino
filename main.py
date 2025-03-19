@@ -115,7 +115,7 @@ def makedecision(train,colors):
     posibilities=[]
     if not data[(colors[1],colors[2],'0')] in MAP:
         if check_ultimake_danger((colors[1],colors[2],'0')):
-            posibilities.append(0)
+            posibilities.append('0')
 
         
                 
@@ -123,7 +123,7 @@ def makedecision(train,colors):
 
     if not data[(colors[1],colors[2],'1')] in MAP:
         if check_ultimake_danger((colors[1],colors[2],'1')):
-            posibilities.append(1)
+            posibilities.append('1')
         
 
     if len(posibilities) == 0:
@@ -138,7 +138,7 @@ def makedecision(train,colors):
     try:
         dec=random.choice(posibilities)
     except:
-        return 0
+        return '0'
     mark_path(train,(colors[1],colors[2],dec))
 
     print(dec)
@@ -259,7 +259,7 @@ def main():
     global trains
     global train_in_danger_zone
 
-    train_count = 1
+    train_count = 2
     blink_delay = 0.5  # in seconds
 
     print("scanning and connecting...")

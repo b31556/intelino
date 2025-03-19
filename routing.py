@@ -115,7 +115,7 @@ def decide(train,at_switch: tuple[str,str]):
 
     return posible_to_go
 
-decide("sigma1",)
+decide("sigma1",())
 
     
 
