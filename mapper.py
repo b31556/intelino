@@ -122,6 +122,7 @@ def command(train, colors):
 
     if colors[2] == 'C':
         if currentzone_beggining:
+            
             if (colors[1],colors[0]) == (currentzone_beggining[0],currentzone_beggining[1]):
                 map[(colors[1],colors[0],0)]=autoincrecemt
                 map[(colors[1],colors[0],1)]=autoincrecemt
