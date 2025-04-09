@@ -67,12 +67,15 @@ def find_next(colors):
     next_valto = intakes[0]
     return next_valto
 
+def can_i_go_there(colors,attime):
+
+
 
 def check_ultimake_danger(colors,attime=time.time()):
-    global MAP
+    global MAP,timetable
     next_valto = find_next(colors)
     if next_valto[2] == "-":
-        if not((next_valto[0],next_valto[1],'0') in MAP) and not((next_valto[0],next_valto[1],'1') in MAP):
+        if not((next_valto[0],next_valto[1],'0') in MAP) or can_i_go_there((next_valto[0],next_valto[1],"1"),attime+timetable[(next_valto[0],next_valto[1],"1")]):
             return True
         else:
             return False
@@ -170,7 +173,8 @@ def detect(train, msg):
                 print(ch)
                 train.set_next_split_steering_decision(SteeringDecision.LEFT if ch == 0 else SteeringDecision.RIGHT)
                 print("left" if ch == 0 else "right")
-                MAP[todel]=train
+                for pl in todel:
+                    MAP[pl]=train
             del trainc[train]
         return
     else:
