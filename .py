@@ -123,6 +123,10 @@ def main():
     graph[9].append((12, 1))
     graph[9].append((11, 1))
 
+    crtr={}
+
+    crtr[0]={7:}
+
 
 
 
