@@ -10,8 +10,7 @@ MAP={"sw1":["st1","sw4","st2"],
      
      }
 
-
-import control
+import requests
 
 from collections import deque
 
@@ -85,8 +84,8 @@ def route(fro,to):
 
 
 
-    control.set_plan(0,manual)
-    control.start_train(0,direction)
+    requests.post(f"http://localhost:5080/{0}",json=manual)
+    requests.post(f"http://localhost:5080/{0}/{direction}")
 
 
     
@@ -94,5 +93,3 @@ def route(fro,to):
     return path if path[0] == fro else []   
 
 print(route("st3","st4"))
-
-i=input("press enter to exit >")

@@ -91,9 +91,10 @@ def receive_data(train_id):
 
 @app.route('/start_train/<train_id>/<direction>', methods=['POST','GET'])
 def receive_data(train_id,di):
-    start_train(train_id,)
+    start_train(train_id,di)
 
     return flask.jsonify({"message":"done"})
 
 main()
-
+print("started server and connected")
+app.run(port=5080,debug=True)
