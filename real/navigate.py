@@ -1,12 +1,14 @@
-MAP={"sw1":["st1","sw4","st2"],
+MAP={"sw1":["st1","kt","st2"],
      "st1":["sw1","sw2"],
      "st2":["sw1","sw2"],
      "sw2":["st2","sw3","st1"],
      
+    "kt":["sw1","sw4"],
+
      "sw3":["st4","sw2","st3"],
      "st3":["sw3","sw4"],
      "st4":["sw3","sw4"],
-     "sw4":["st3","sw1","st4"],
+     "sw4":["st3","kt","st4"],
      
      }
 
@@ -24,6 +26,9 @@ def route(fro,to):
         if node == to:
             break
 
+        if node == None:
+            continue
+
         neighs=[]
 
         if len(MAP[node]) == 3:
@@ -34,7 +39,13 @@ def route(fro,to):
                 neighs.append(MAP[node][1])
 
         else:
-            if parent.get(node) == MAP[node][0]:
+            if False:
+                neighs.append(MAP[node][0])
+                neighs.append(MAP[node][1])
+            elif parent.get(node) == None:
+                neighs.append(MAP[node][0])
+                neighs.append(MAP[node][1])
+            elif parent.get(node) == MAP[node][0]:
                 neighs.append(MAP[node][1])
             else:
                 neighs.append(MAP[node][0])
@@ -81,6 +92,7 @@ def route(fro,to):
 
     print(manual)
     print(direction)
+    print(path)
 
 
 
@@ -92,4 +104,4 @@ def route(fro,to):
 
     return path if path[0] == fro else []   
 
-print(route("st3","st4"))
+print(route("st1","st4"))

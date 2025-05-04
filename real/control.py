@@ -23,13 +23,13 @@ def handle_split(train,msg):
 
     if len(plan) != 0:
         if isinstance(PLAN[train][0],int):
-            decision=PLAN[train].pop(0)
+            decision=plan(train)
             train.set_next_split_steering_decision(SteeringDecision.LEFT if decision==0 else SteeringDecision.RIGHT)
         print("set decision")
 
 def handle_station(train,msg):
     if msg.colors==(C.WHITE,C.MAGENTA,C.GREEN,C.BLACK):
-        pp = PLAN[train].pop(0)
+        pp = replan(train)
 
         if pp == "pass":
             pass
@@ -40,7 +40,7 @@ def handle_station(train,msg):
         
         if len(PLAN[train]) != 0:
             if isinstance(PLAN[train][0],int):
-                decision=PLAN[train].pop(0)
+                decision=replan(train)
                 train.set_next_split_steering_decision(SteeringDecision.LEFT if decision==0 else SteeringDecision.RIGHT)
     
 
@@ -72,7 +72,7 @@ def set_plan(train_id,plan):
     global trains,PLAN
     PLAN[trains[train_id]] = plan
     if isinstance(PLAN[trains[train_id]][0],int):
-        decision=PLAN[trains[train_id]].pop(0)
+        decision=replan(trains[train_id])
         trains[train_id].set_next_split_steering_decision(SteeringDecision.LEFT if decision==0 else SteeringDecision.RIGHT)
  
 
