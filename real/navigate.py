@@ -16,7 +16,7 @@ import requests
 
 from collections import deque
 
-def route(fro,to):
+def route(fro,to, occupation:list[str]):
     que = deque([fro])
     visited=set([fro])
     parent={fro:None}
@@ -27,6 +27,9 @@ def route(fro,to):
             break
 
         if node == None:
+            continue
+
+        if node in occupation:
             continue
 
         neighs=[]
@@ -90,18 +93,22 @@ def route(fro,to):
 
     direction=(0 if MAP[path[0]][0]==path[1] else 1) if len(MAP[path[0]])==2 else "KYS"
 
-    print(manual)
-    print(direction)
-    print(path)
+    
 
-
-
-    requests.post(f"http://localhost:5080/{0}",json=manual)
-    requests.post(f"http://localhost:5080/{0}/{direction}")
 
 
     
 
-    return path if path[0] == fro else []   
 
-print(route("st1","st4"))
+    
+
+    return manual,direction,path
+
+if __name__ == "__main__":
+    import time
+    start = time.time()
+    for i in range(10000):
+        route("st1","st4")
+    print(route("st1","st4"))
+    
+    print("made 10 000 planning; Time taken:", time.time()-start)
