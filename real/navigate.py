@@ -3,7 +3,9 @@ MAP={"sw1":["st1","kt","st2"],
      "st2":["sw1","sw2"],
      "sw2":["st2","sw3","st1"],
      
-    "kt":["sw1","sw4"],
+    "kt":["sw1","sw4","stX"],
+
+        "stX":["kt",None],
 
      "sw3":["st4","sw2","st3"],
      "st3":["sw3","sw4"],
@@ -11,6 +13,12 @@ MAP={"sw1":["st1","kt","st2"],
      "sw4":["st3","kt","st4"],
      
      }
+"""
+MAP={"st1":[None,"sw1"],
+    "st2":[None,"sw1"],
+    "sw1":["st1","st3","st2"],
+    "st3":[None,"sw1"]}
+"""
 
 import requests
 
@@ -18,7 +26,7 @@ from collections import deque
 
 def route(fro,to, occupation:list[str]):
     que = deque([fro])
-    visited=set([fro])
+    visited=set([])
     parent={fro:None}
 
     while que:
@@ -42,7 +50,7 @@ def route(fro,to, occupation:list[str]):
                 neighs.append(MAP[node][1])
 
         else:
-            if False:
+            if True:
                 neighs.append(MAP[node][0])
                 neighs.append(MAP[node][1])
             elif parent.get(node) == None:
@@ -58,8 +66,8 @@ def route(fro,to, occupation:list[str]):
 
 
         for neigh in neighs:
-            if neigh not in visited:
-                visited.add(neigh)
+            if f"{node}+{neigh}" not in visited:
+                visited.add(f"{node}+{neigh}")
                 parent[neigh] = node
                 que.append(neigh)
 
@@ -68,6 +76,8 @@ def route(fro,to, occupation:list[str]):
     current=to
     while current is not None:
 
+        if current in path:
+            break
         
 
         if len(MAP[current]) == 2:
@@ -82,25 +92,21 @@ def route(fro,to, occupation:list[str]):
                     manual.append(0)
                 if current == MAP[parent.get(current)][2]:
                     manual.append(1)
-        
+
 
         path.append(current)
         current=parent.get(current)
+
+    if current is not None:
+        return route(fro,parent.get(current),occupation)
+
     path.reverse()
     manual.reverse()
 
-    manual.pop(0)
+    if MAP[path[0]][0]==path[1]:
+        manual.pop(0)
 
     direction=(0 if MAP[path[0]][0]==path[1] else 1) if len(MAP[path[0]])==2 else "KYS"
-
-    
-
-
-
-    
-
-
-    
 
     return manual,direction,path
 
@@ -108,7 +114,7 @@ if __name__ == "__main__":
     import time
     start = time.time()
     for i in range(10000):
-        route("st1","st4")
-    print(route("st1","st4"))
-    
+        route("st1","st2",[])
+    print(route("sw3","stX",["sw1"]))
+     
     print("made 10 000 planning; Time taken:", time.time()-start)

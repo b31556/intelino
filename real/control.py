@@ -24,14 +24,6 @@ NEXT_STATION={} # train: str
 
 trains=[]
 
-def replan(train):
-    plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],POSITION.items())
-    train.drive_at_speed(40,MovementDirection.FORWARD if direction==0 else MovementDirection.BACKWARD)
-    global NEXT_STATION
-    NEXT_STATION[train]=stations[1]
-    if len(plan) == 0:
-        return False
-    return plan.pop(0)
 
 def is_next_turn(train=None,plan=None):
     if plan is None:
@@ -51,13 +43,22 @@ def handle_station(train,msg):
         global POSITION,DESTINATION,NEXT_STATION
         POSITION[train]=NEXT_STATION[train]
 
-        pp = replan(train)
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train])
         
+        if direction is not "KYS":
+            train.drive_at_speed(40,MovementDirection.FORWARD if direction==0 else MovementDirection.BACKWARD)
+
+        global NEXT_STATION
         NEXT_STATION[train]=stations[1]
-        if pp == "pass":
+
+        if len(plan) == 0:
+            return False
+        pp= plan.pop(0)
+        
+        NEXT_STATION[train]=stations[1]
+        if pp == "pass" or pp == "stop":
             is_next_turn(plan=pp)
-        elif pp=="stop":
+        elif POSITION[train] == DESTINATION[train]:
             train.stop_driving()
         elif not pp:
             train.stop_driving()
@@ -71,10 +72,7 @@ def handle_color_change(train,msg):
         POSITION[train]=NEXT_STATION[train]
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train])
         NEXT_STATION[train]=stations[1]
-        if is_next_turn(train):
-            decision=replan(train)
-            train.set_next_split_steering_decision(SteeringDecision.LEFT if decision==0 else SteeringDecision.RIGHT)
-            print("set decision")
+        is_next_turn(train)
          
 
 
@@ -103,32 +101,111 @@ def main():
     
 
 
-def set_plan(train_id,plan):
-    global trains,PLAN
-    PLAN[trains[train_id]] = plan
-    if isinstance(PLAN[trains[train_id]][0],int):
-        decision=replan(trains[train_id])
-        trains[train_id].set_next_split_steering_decision(SteeringDecision.LEFT if decision==0 else SteeringDecision.RIGHT)
- 
-
-def start_train(train_id,direction):
-    global trains
-    train=trains[train_id]
-    train.drive_at_speed(40,MovementDirection.FORWARD if direction==0 else MovementDirection.BACKWARD)
+def set_plan(train_id:int,destination:str):
+    global trains,DESTINATION
+    train=trains[int(train_id)]
+    DESTINATION[train] = destination
+    print(f"set plan for {train_id} from {POSITION[trains[train_id]]} to {destination}")
+    plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train])
+    is_next_turn(train_id,plan)
+    if direction is not "KYS":
+        train.drive_at_speed(40,MovementDirection.FORWARD if direction==0 else MovementDirection.BACKWARD)
 
 @app.route('/set_plan/<train_id>', methods=['POST'])
 def receive_data(train_id):
-    data = flask.request.get_json()
+    data = flask.request.get_data(as_text=True)
     print(f"Server received: {data}")
-    set_plan(train_id,data)
+    set_plan(int(train_id),str(data))
 
     return flask.jsonify({"message":"done"})
 
-@app.route('/start_train/<train_id>/<direction>', methods=['POST','GET'])
-def receive_data(train_id,di):
-    start_train(train_id,di)
+@app.route('/get_trains', methods=['GET'])
+def get_trains():
+    global trains
+    train_ids = [str(train) for train in trains]
+    return flask.jsonify({"trains": train_ids})
 
-    return flask.jsonify({"message":"done"})
+@app.route('/get_destinations', methods=['GET'])
+def get_destinations():
+    return flask.jsonify(DESTINATION)
+
+@app.route('/get_next_stations', methods=['GET'])
+def get_next_stations():
+    return flask.jsonify(NEXT_STATION)
+
+@app.route('/get_positions', methods=['GET'])
+def get_positions():
+    return flask.jsonify(POSITION)
+
+@app.route('/')
+def index(): #returns a wabpage where you can see the train ids positions and destinations as well as the next stations, real time with 1 second refresh by fetching the data from the server
+    return """
+    <h1>Train Control Server</h1>
+    <h2>Train IDs</h2>
+    <a id="train_ids">
+    </a>
+    <h2>Train Positions</h2>
+    <a id="train_positions">
+    </a>
+    <h2>Train Destinations</h2>
+    <a id="train_destinations">
+    </a>
+    <h2>Next Stations</h2>
+    <a id="train_next_stations">
+    </a>
+    <h1>Set Plan</h1>
+    <form id="set_plan_form">
+        <label for="train_id">Train ID:</label>
+        <input type="text" id="train_id" name="train_id"><br><br>
+        <label for="destination">Destination:</label>
+        <input type="text" id="destination" name="destination"><br><br>
+        <input type="submit" value="Set Plan">
+    </form>
+    <script>
+        document.getElementById('set_plan_form').addEventListener('submit', function(event) {
+            event.preventDefault(); // Prevent the form from submitting normally
+
+            const trainId = document.getElementById('train_id').value;
+            const destination = document.getElementById('destination').value;
+
+            fetch('/set_plan/' + trainId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(destination)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                alert(data);
+            });
+        });
+        // Fetch data every second
+        setInterval(function(){
+            fetch('/get_trains')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('train_ids').innerHTML = JSON.stringify(data);
+            });
+            fetch('/get_positions')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('train_positions').innerHTML = JSON.stringify(data);
+            });
+            fetch('/get_destinations')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('train_destinations').innerHTML = JSON.stringify(data);
+            });
+            fetch('/get_next_stations')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('train_next_stations').innerHTML = JSON.stringify(data);
+            });
+        }, 500);
+    </script>
+    """
 
 main()
 print("started server and connected")
