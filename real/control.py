@@ -9,6 +9,7 @@ from intelino.trainlib.enums import (
 )
 from intelino.trainlib.messages import TrainMsgEventSnapCommandDetected
 
+import os
 import flask
 app=flask.Flask(__name__)
 
@@ -27,10 +28,10 @@ trains=[]
 
 def is_next_turn(train=None,plan=None):
     if plan is None:
-        plan=navigate.route(POSITION[train],DESTINATION[train],POSITION.items())[0]
+        plan=navigate.route(POSITION[train],DESTINATION[train],[])[0]
     if len(plan) == 0:
         return False
-    decision=plan(train).pop(0)
+    decision=plan.pop(0)
     if isinstance(decision,int):
         train.set_next_split_steering_decision(SteeringDecision.LEFT if decision==0 else SteeringDecision.RIGHT)
     
@@ -43,12 +44,18 @@ def handle_station(train,msg):
         global POSITION,DESTINATION,NEXT_STATION
         POSITION[train]=NEXT_STATION[train]
 
-        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train])
+        if POSITION[train]==DESTINATION[train]:
+            train.stop_driving()
+            return
+
+
+
+        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],[])
         
-        if direction is not "KYS":
+        if direction != "KYS":
+        
             train.drive_at_speed(40,MovementDirection.FORWARD if direction==0 else MovementDirection.BACKWARD)
 
-        global NEXT_STATION
         NEXT_STATION[train]=stations[1]
 
         if len(plan) == 0:
@@ -56,37 +63,36 @@ def handle_station(train,msg):
         pp= plan.pop(0)
         
         NEXT_STATION[train]=stations[1]
-        if pp == "pass" or pp == "stop":
-            is_next_turn(plan=pp)
-        elif POSITION[train] == DESTINATION[train]:
+        
+        if POSITION[train] == DESTINATION[train]:
             train.stop_driving()
-        elif not pp:
+        elif pp:
             train.stop_driving()
             raise Exception("no path")
-        else:
-            raise Exception("not understood command")
+        
+        is_next_turn(train)
 
 def handle_color_change(train,msg):
     if msg.color == C.CYAN:
         global POSITION,DESTINATION,NEXT_STATION
         POSITION[train]=NEXT_STATION[train]
-        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train])
+        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],[])
         NEXT_STATION[train]=stations[1]
         is_next_turn(train)
          
 
 
 def main():
-    global trains
+    global trains, POSITION
 
     train_count = 1
     blink_delay = 0.5  # in seconds
 
     print("scanning and connecting...")
 
-    trains_list = TrainScanner(timeout=4.0).get_trains(train_count)
+    trains_list = TrainScanner(timeout=6.0).get_trains(train_count)
 
-    print("connected train count:", len(trains))
+    print("connected train count:", len(trains_list))
 
     for t in trains_list:
         #t.drive_at_speed(random.randint(30,60))
@@ -97,18 +103,23 @@ def main():
         t.set_snap_command_feedback(False,False)
         
         trains.append(t)
+
+        POSITION[t] = "st1" 
+
         
     
 
 
 def set_plan(train_id:int,destination:str):
-    global trains,DESTINATION
+    destination=destination.replace('"','')
+    global trains,DESTINATION,NEXT_STATION
     train=trains[int(train_id)]
     DESTINATION[train] = destination
     print(f"set plan for {train_id} from {POSITION[trains[train_id]]} to {destination}")
-    plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train])
-    is_next_turn(train_id,plan)
-    if direction is not "KYS":
+    plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],[])  ##### IMPLAMENT OCCUPATION
+    NEXT_STATION[train] = stations[1]
+    is_next_turn(train,plan)
+    if direction != "KYS":
         train.drive_at_speed(40,MovementDirection.FORWARD if direction==0 else MovementDirection.BACKWARD)
 
 @app.route('/set_plan/<train_id>', methods=['POST'])
@@ -122,20 +133,29 @@ def receive_data(train_id):
 @app.route('/get_trains', methods=['GET'])
 def get_trains():
     global trains
-    train_ids = [str(train) for train in trains]
+    train_ids = [train.id for train in trains]
     return flask.jsonify({"trains": train_ids})
 
 @app.route('/get_destinations', methods=['GET'])
 def get_destinations():
-    return flask.jsonify(DESTINATION)
+    poses={}
+    for key in DESTINATION:
+        poses[str(key.id)]=DESTINATION[key]
+    return flask.jsonify(poses)
 
 @app.route('/get_next_stations', methods=['GET'])
 def get_next_stations():
-    return flask.jsonify(NEXT_STATION)
+    poses={}
+    for key in NEXT_STATION:
+        poses[str(key.id)]=NEXT_STATION[key]
+    return flask.jsonify(poses)
 
 @app.route('/get_positions', methods=['GET'])
 def get_positions():
-    return flask.jsonify(POSITION)
+    poses={}
+    for key in POSITION:
+        poses[str(key.id)]=POSITION[key]
+    return flask.jsonify(poses)
 
 @app.route('/')
 def index(): #returns a wabpage where you can see the train ids positions and destinations as well as the next stations, real time with 1 second refresh by fetching the data from the server
@@ -207,6 +227,10 @@ def index(): #returns a wabpage where you can see the train ids positions and de
     </script>
     """
 
+
+
 main()
-print("started server and connected")
-app.run(port=5080,debug=True)
+
+if __name__=='__main__':
+    app.run(port=5080,debug=True)
+

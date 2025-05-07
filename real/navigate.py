@@ -1,16 +1,12 @@
-MAP={"sw1":["st1","kt","st2"],
+MAP={"sw1":["st1","sw4","st2"],
      "st1":["sw1","sw2"],
      "st2":["sw1","sw2"],
      "sw2":["st2","sw3","st1"],
-     
-    "kt":["sw1","sw4","stX"],
-
-        "stX":["kt",None],
 
      "sw3":["st4","sw2","st3"],
      "st3":["sw3","sw4"],
      "st4":["sw3","sw4"],
-     "sw4":["st3","kt","st4"],
+     "sw4":["st3","sw1","st4"],
      
      }
 """
@@ -25,6 +21,8 @@ import requests
 from collections import deque
 
 def route(fro,to, occupation:list[str]):
+    if fro==to:
+        return [],[],[]
     que = deque([fro])
     visited=set([])
     parent={fro:None}
@@ -43,14 +41,18 @@ def route(fro,to, occupation:list[str]):
         neighs=[]
 
         if len(MAP[node]) == 3:
-            if parent.get(node) == MAP[node][1]:
+            if parent.get(node) is None:
+                neighs.append(MAP[node][0])
+                neighs.append(MAP[node][2])
+                neighs.append(MAP[node][1])
+            elif parent.get(node) == MAP[node][1]:
                 neighs.append(MAP[node][0])
                 neighs.append(MAP[node][2])
             else:
                 neighs.append(MAP[node][1])
 
         else:
-            if True:
+            if False:
                 neighs.append(MAP[node][0])
                 neighs.append(MAP[node][1])
             elif parent.get(node) == None:
