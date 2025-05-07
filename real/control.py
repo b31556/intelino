@@ -16,6 +16,7 @@ app=flask.Flask(__name__)
 
 import navigate
 
+LAST_STATTION={} #train: str
 
 DESTINATION={} # train: str
 
@@ -26,9 +27,19 @@ NEXT_STATION={} # train: str
 trains=[]
 
 
+def make_occupation(train):
+    occupation=[]
+    for key in POSITION:
+        if key != train:
+            occupation.append(POSITION[key])
+    for key in NEXT_STATION:
+        if key != train:
+            occupation.append(NEXT_STATION[key])
+    return occupation
+
 def is_next_turn(train=None,plan=None):
     if plan is None:
-        plan=navigate.route(POSITION[train],DESTINATION[train],[])[0]
+        plan=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])[0]
     if len(plan) == 0:
         return False
     decision=plan.pop(0)
@@ -41,8 +52,10 @@ def handle_split(train,msg):
 
 def handle_station(train,msg):
     if msg.colors[:3]==(C.WHITE,C.MAGENTA,C.GREEN):
-        global POSITION,DESTINATION,NEXT_STATION
+        global POSITION,DESTINATION,NEXT_STATION,LAST_STATTION
+        LAST_STATTION[train]=POSITION[train]
         POSITION[train]=NEXT_STATION[train]
+
 
         if POSITION[train]==DESTINATION[train]:
             train.stop_driving()
@@ -50,7 +63,7 @@ def handle_station(train,msg):
 
 
 
-        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],[])
+        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
         
         if direction != "KYS":
         
@@ -74,9 +87,10 @@ def handle_station(train,msg):
 
 def handle_color_change(train,msg):
     if msg.color == C.CYAN:
-        global POSITION,DESTINATION,NEXT_STATION
+        global POSITION,DESTINATION,NEXT_STATION,LAST_STATTION
+        LAST_STATTION[train]=POSITION[train]
         POSITION[train]=NEXT_STATION[train]
-        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],[])
+        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
         NEXT_STATION[train]=stations[1]
         is_next_turn(train)
          
@@ -94,6 +108,8 @@ def main():
 
     print("connected train count:", len(trains_list))
 
+    posible_positions=["st1","st2","st3","st4"]
+
     for t in trains_list:
         #t.drive_at_speed(random.randint(30,60))
         t.add_split_decision_listener(handle_split)
@@ -104,7 +120,8 @@ def main():
         
         trains.append(t)
 
-        POSITION[t] = "st1" 
+        POSITION[t] = posible_positions.pop(0)
+        print(f"train {t.id} position: {POSITION[t]}")
 
         
     
@@ -116,7 +133,7 @@ def set_plan(train_id:int,destination:str):
     train=trains[int(train_id)]
     DESTINATION[train] = destination
     print(f"set plan for {train_id} from {POSITION[trains[train_id]]} to {destination}")
-    plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],[])  ##### IMPLAMENT OCCUPATION
+    plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])  ##### IMPLAMENT OCCUPATION
     NEXT_STATION[train] = stations[1]
     is_next_turn(train,plan)
     if direction != "KYS":
@@ -229,8 +246,9 @@ def index(): #returns a wabpage where you can see the train ids positions and de
 
 
 
-main()
+
 
 if __name__=='__main__':
-    app.run(port=5080,debug=True)
+    print("SIGMA")
+    app.run(port=5080,debug=False,use_reloader=False)
 

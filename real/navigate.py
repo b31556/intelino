@@ -20,31 +20,42 @@ import requests
 
 from collections import deque
 
-def route(fro,to, occupation:list[str]):
+def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
     if fro==to:
         return [],[],[]
     que = deque([fro])
     visited=set([])
     parent={fro:None}
 
+    sucess=False
+
     while que:
         node=que.popleft()
         if node == to:
+            sucess=True
             break
 
         if node == None:
             continue
 
         if node in occupation:
-            continue
+            if not lasz_attempt:
+                continue
 
         neighs=[]
 
         if len(MAP[node]) == 3:
             if parent.get(node) is None:
-                neighs.append(MAP[node][0])
-                neighs.append(MAP[node][2])
-                neighs.append(MAP[node][1])
+                if last_station is not None:
+                    if last_station == MAP[node][1]:
+                        neighs.append(MAP[node][0])
+                        neighs.append(MAP[node][2])
+                    else:
+                        neighs.append(MAP[node][1])
+                else:
+                    neighs.append(MAP[node][0])
+                    neighs.append(MAP[node][2])
+                    neighs.append(MAP[node][1])
             elif parent.get(node) == MAP[node][1]:
                 neighs.append(MAP[node][0])
                 neighs.append(MAP[node][2])
@@ -72,6 +83,10 @@ def route(fro,to, occupation:list[str]):
                 visited.add(f"{node}+{neigh}")
                 parent[neigh] = node
                 que.append(neigh)
+
+    if not sucess:
+        if not lasz_attempt:
+            return route(fro,to,occupation,last_station,True)
 
     path=[]
     manual=[]
@@ -105,18 +120,18 @@ def route(fro,to, occupation:list[str]):
     path.reverse()
     manual.reverse()
 
-    if MAP[path[0]][0]==path[1]:
-        manual.pop(0)
+    for path_elem_index in range(len(path)-1):
+        path_elem=path[path_elem_index]
+        if path_elem in occupation:
+            path=path[:path_elem_index+1:]
+            break
+
+    
+    manual.pop(0)  ###TODO: REMOVE THIS IF THE STATION IS SHORT AND THE TRAIN MIGHT PASS IT
 
     direction=(0 if MAP[path[0]][0]==path[1] else 1) if len(MAP[path[0]])==2 else "KYS"
 
     return manual,direction,path
 
 if __name__ == "__main__":
-    import time
-    start = time.time()
-    for i in range(10000):
-        route("st1","st2",[])
-    print(route("sw3","stX",["sw1"]))
-     
-    print("made 10 000 planning; Time taken:", time.time()-start)
+    print(route("st1","st4",["sw1","sw2"]))
