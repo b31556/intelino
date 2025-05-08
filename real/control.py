@@ -1,20 +1,20 @@
 import json
 import random
 import time
+
 from intelino.trainlib import TrainScanner, Train
 from intelino.trainlib.enums import (
     SnapColorValue as C,
     SteeringDecision,
     MovementDirection
 )
-from intelino.trainlib.messages import TrainMsgEventSnapCommandDetected
 
-import os
 import flask
 app=flask.Flask(__name__)
 
 
 import navigate
+
 
 LAST_STATTION={} #train: str
 
@@ -37,7 +37,7 @@ def make_occupation(train):
             occupation.append(NEXT_STATION[key])
     return occupation
 
-def is_next_turn(train=None,plan=None):
+def is_next_a_turn(train=None,plan=None):
     if plan is None:
         plan=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])[0]
     if len(plan) == 0:
@@ -46,7 +46,6 @@ def is_next_turn(train=None,plan=None):
     if isinstance(decision,int):
         train.set_next_split_steering_decision(SteeringDecision.LEFT if decision==0 else SteeringDecision.RIGHT)
     
-
 def handle_split(train,msg):
     pass
 
@@ -56,12 +55,9 @@ def handle_station(train,msg):
         LAST_STATTION[train]=POSITION[train]
         POSITION[train]=NEXT_STATION[train]
 
-
         if POSITION[train]==DESTINATION[train]:
             train.stop_driving()
             return
-
-
 
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
         
@@ -83,7 +79,7 @@ def handle_station(train,msg):
             train.stop_driving()
             raise Exception("no path")
         
-        is_next_turn(train)
+        is_next_a_turn(train)
 
 def handle_color_change(train,msg):
     if msg.color == C.CYAN:
@@ -92,7 +88,7 @@ def handle_color_change(train,msg):
         POSITION[train]=NEXT_STATION[train]
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
         NEXT_STATION[train]=stations[1]
-        is_next_turn(train)
+        is_next_a_turn(train)
          
 
 
@@ -135,7 +131,7 @@ def set_plan(train_id:int,destination:str):
     print(f"set plan for {train_id} from {POSITION[trains[train_id]]} to {destination}")
     plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])  ##### IMPLAMENT OCCUPATION
     NEXT_STATION[train] = stations[1]
-    is_next_turn(train,plan)
+    is_next_a_turn(train,plan)
     if direction != "KYS":
         train.drive_at_speed(40,MovementDirection.FORWARD if direction==0 else MovementDirection.BACKWARD)
 
@@ -173,6 +169,15 @@ def get_positions():
     for key in POSITION:
         poses[str(key.id)]=POSITION[key]
     return flask.jsonify(poses)
+
+@app.route('/get_plans', methods=['GET'])
+def get_plans():
+    plans={}
+    for train_id in range(len(trains)-1):
+        train=trains[train_id]
+        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
+        plans[train_id] = stations
+    return flask.jsonify(plans)
 
 @app.route('/')
 def index(): #returns a wabpage where you can see the train ids positions and destinations as well as the next stations, real time with 1 second refresh by fetching the data from the server
@@ -249,6 +254,6 @@ def index(): #returns a wabpage where you can see the train ids positions and de
 
 
 if __name__=='__main__':
-    print("SIGMA")
+    main()
     app.run(port=5080,debug=False,use_reloader=False)
 

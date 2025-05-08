@@ -1,3 +1,4 @@
+"""
 MAP={"sw1":["st1","sw4","st2"],
      "st1":["sw1","sw2"],
      "st2":["sw1","sw2"],
@@ -10,11 +11,18 @@ MAP={"sw1":["st1","sw4","st2"],
      
      }
 """
+"""
 MAP={"st1":[None,"sw1"],
     "st2":[None,"sw1"],
     "sw1":["st1","st3","st2"],
     "st3":[None,"sw1"]}
 """
+
+import json
+
+with open("map.json","r") as f:
+    MAP=json.loads(f.read())
+
 
 import requests
 
