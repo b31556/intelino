@@ -120,7 +120,6 @@ def main():
         print(f"train {t.id} position: {POSITION[t]}")
 
         
-    
 
 
 def set_plan(train_id:int,destination:str):

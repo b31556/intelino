@@ -23,9 +23,6 @@ import json
 with open("map.json","r") as f:
     MAP=json.loads(f.read())
 
-
-import requests
-
 from collections import deque
 
 def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
