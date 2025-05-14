@@ -50,7 +50,7 @@ def handle_split(train,msg):
     pass
 
 def handle_station(train,msg):
-    if msg.colors[:3]==(C.WHITE,C.MAGENTA,C.GREEN):
+    if msg.colors[:3]==(C.WHITE,C.MAGENTA,C.WHITE) or msg.colors[:3]==(C.WHITE,C.BLACK,C.BLACK):
         global POSITION,DESTINATION,NEXT_STATION,LAST_STATTION
         LAST_STATTION[train]=POSITION[train]
         POSITION[train]=NEXT_STATION[train]
@@ -75,9 +75,7 @@ def handle_station(train,msg):
         
         if POSITION[train] == DESTINATION[train]:
             train.stop_driving()
-        elif pp:
-            train.stop_driving()
-            raise Exception("no path")
+        
         
         is_next_a_turn(train)
 
@@ -93,7 +91,7 @@ def handle_color_change(train,msg):
 
 
 def main():
-    global trains, POSITION
+    global trains, POSITION, LAST_STATTION
 
     train_count = 1
     blink_delay = 0.5  # in seconds
@@ -104,7 +102,7 @@ def main():
 
     print("connected train count:", len(trains_list))
 
-    posible_positions=["st1","st2","st3","st4"]
+    posible_positions=["allkulon"]
 
     for t in trains_list:
         #t.drive_at_speed(random.randint(30,60))
@@ -117,6 +115,7 @@ def main():
         trains.append(t)
 
         POSITION[t] = posible_positions.pop(0)
+        LAST_STATTION[t] = POSITION[t]
         print(f"train {t.id} position: {POSITION[t]}")
 
         

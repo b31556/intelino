@@ -1,11 +1,10 @@
-{"sw1":["st1","sw4","st2"],
-     "st1":["sw1","sw2"],
-     "st2":["sw1","sw2"],
-     "sw2":["st2","sw3","st1"],
-
-     "sw3":["st4","sw2","st3"],
-     "st3":["sw3","sw4"],
-     "st4":["sw3","sw4"],
-     "sw4":["st3","sw1","st4"]
-     
-}
+{"allkulon": [null, "sw1"],
+    "sw1": ["allkulon", "st1", null],
+    "st1": ["sw1", "sw2"],
+    "sw2": ["st3", "st1", null],
+    "st3": ["sw2", "st4"],
+    "st4": ["st3", "sw4"],
+    "sw4": ["st5", null, "st4"],
+    "st5": ["sw4", "sw5"],
+    "sw5": ["st5", "st2", "st7"],
+    "st7": ["sw5", null]}

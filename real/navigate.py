@@ -17,10 +17,23 @@ MAP={"st1":[None,"sw1"],
     "sw1":["st1","st3","st2"],
     "st3":[None,"sw1"]}
 """
+MAP={
+    "allkulon": [None, "sw1"],
+    "sw1": ["alkulon", "st1", "st2"],
+    "st1": ["sw1", "sw2"],
+    "sw2": ["st3", "st1", "sw3"],
+    "st3": ["sw2", "st4"],
+    "st4": ["st3", "sw4"],
+    "sw4": ["st5", None, "st4"],
+    "st5": ["sw4", "sw5"],
+    "sw5": ["st5", "st2", "st7"],
+    "st7": ["sw5", None]
+
+}
 
 import json
 
-with open("map.json","r") as f:
+with open("real/map.json","r") as f:
     MAP=json.loads(f.read())
 
 from collections import deque
