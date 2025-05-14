@@ -1,0 +1,1 @@
+autonomous rail network with advanced logics like path finding, pedestrian navigation by public transport, and in the future a game to optimize the trains schedule, it all uses the intelino smart trains, the structure can be confusing this project is in development!!
