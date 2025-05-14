@@ -17,23 +17,11 @@ MAP={"st1":[None,"sw1"],
     "sw1":["st1","st3","st2"],
     "st3":[None,"sw1"]}
 """
-MAP={
-    "allkulon": [None, "sw1"],
-    "sw1": ["alkulon", "st1", "st2"],
-    "st1": ["sw1", "sw2"],
-    "sw2": ["st3", "st1", "sw3"],
-    "st3": ["sw2", "st4"],
-    "st4": ["st3", "sw4"],
-    "sw4": ["st5", None, "st4"],
-    "st5": ["sw4", "sw5"],
-    "sw5": ["st5", "st2", "st7"],
-    "st7": ["sw5", None]
 
-}
 
 import json
 
-with open("real/map.json","r") as f:
+with open("intelino/real/map.json","r") as f:
     MAP=json.loads(f.read())
 
 from collections import deque
@@ -152,4 +140,4 @@ def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
     return manual,direction,path
 
 if __name__ == "__main__":
-    print(route("st1","st4",["sw1","sw2"]))
+    print(route("allkulon","st10",[]))
