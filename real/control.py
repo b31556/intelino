@@ -39,7 +39,8 @@ def make_occupation(train):
 
 def is_next_a_turn(train=None,plan=None):
     if plan is None:
-        plan=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])[0]
+        plan,direction,ss=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
+    
     if len(plan) == 0:
         return False
     decision=plan.pop(0)
@@ -61,23 +62,20 @@ def handle_station(train,msg):
 
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
         
-        if direction != "KYS":
-        
-            train.drive_at_speed(40,MovementDirection.FORWARD if direction==0 else MovementDirection.BACKWARD)
-
-        NEXT_STATION[train]=stations[1]
+        if direction == 1:
+            train.drive_at_speed(40,MovementDirection.INVERT)
+            NEXT_STATION[train]=stations[0]
+        else:
+            NEXT_STATION[train]=stations[1]
 
         if len(plan) == 0:
             return False
-        pp= plan.pop(0)
-        
-        NEXT_STATION[train]=stations[1]
         
         if POSITION[train] == DESTINATION[train]:
             train.stop_driving()
         
         
-        is_next_a_turn(train)
+        is_next_a_turn(train,plan=plan)
 
 def handle_color_change(train,msg):
     if msg.color == C.CYAN:
@@ -85,8 +83,12 @@ def handle_color_change(train,msg):
         LAST_STATTION[train]=POSITION[train]
         POSITION[train]=NEXT_STATION[train]
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
-        NEXT_STATION[train]=stations[1]
-        is_next_a_turn(train)
+        if direction == 1:
+            train.drive_at_speed(40,MovementDirection.INVERT)
+            NEXT_STATION[train]=stations[0]
+        else:
+            NEXT_STATION[train]=stations[1]
+        is_next_a_turn(train,plan=plan)
          
 
 

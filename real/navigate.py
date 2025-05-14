@@ -56,8 +56,11 @@ def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
                     if last_station == MAP[node][1]:
                         neighs.append(MAP[node][0])
                         neighs.append(MAP[node][2])
-                    else:
-                        neighs.append(MAP[node][1])
+                    if last_station == MAP[node][0]:
+                        neighs.append(MAP[node][0])
+                    if last_station == MAP[node][2]:
+                        neighs.append(MAP[node][2])
+                    neighs.append(MAP[node][1])
                 else:
                     neighs.append(MAP[node][0])
                     neighs.append(MAP[node][2])
@@ -135,9 +138,9 @@ def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
     
     manual.pop(0)  ###TODO: REMOVE THIS IF THE STATION IS SHORT AND THE TRAIN MIGHT PASS IT
 
-    direction=(0 if MAP[path[0]][0]==path[1] else 1) if len(MAP[path[0]])==2 else "KYS"
+    direction=(0 if (MAP[fro][0] == last_station) ^ (MAP[path[0]][0] == path[1]) else 1) if len(MAP[path[0]]) == 2 else (0 if (MAP[fro][1] == last_station) ^ (MAP[path[0]][1] == path[1]) else 1)
 
     return manual,direction,path
 
 if __name__ == "__main__":
-    print(route("allkulon","st10",[]))
+    print(route("sw1","st10",[],"st1"))
