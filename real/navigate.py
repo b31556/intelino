@@ -1,32 +1,16 @@
-"""
-MAP={"sw1":["st1","sw4","st2"],
-     "st1":["sw1","sw2"],
-     "st2":["sw1","sw2"],
-     "sw2":["st2","sw3","st1"],
-
-     "sw3":["st4","sw2","st3"],
-     "st3":["sw3","sw4"],
-     "st4":["sw3","sw4"],
-     "sw4":["st3","sw1","st4"],
-     
-     }
-"""
-"""
-MAP={"st1":[None,"sw1"],
-    "st2":[None,"sw1"],
-    "sw1":["st1","st3","st2"],
-    "st3":[None,"sw1"]}
-"""
-
-
+from collections import deque
 import json
 
-with open("intelino/real/map.json","r") as f:
-    MAP=json.loads(f.read())
 
-from collections import deque
+try:
+    with open("intelino/real/map.json","r") as f:
+        MAP=json.loads(f.read())
+except FileNotFoundError:
+    with open("real/map.json","r") as f:
+        MAP=json.loads(f.read())
 
-def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
+
+def depth_first_search(fro,to,occupation,last_station):
     if fro==to:
         return [],[],[]
     que = deque([fro])
@@ -45,8 +29,7 @@ def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
             continue
 
         if node in occupation:
-            if not lasz_attempt:
-                continue
+            continue
 
         neighs=[]
 
@@ -83,10 +66,6 @@ def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
             else:
                 neighs.append(MAP[node][0])
 
-
-
-
-
         for neigh in neighs:
             if f"{node}+{neigh}" not in visited:
                 visited.add(f"{node}+{neigh}")
@@ -94,8 +73,7 @@ def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
                 que.append(neigh)
 
     if not sucess:
-        if not lasz_attempt:
-            return route(fro,to,occupation,last_station,True)
+        return [],[]
 
     path=[]
     manual=[]
@@ -105,7 +83,6 @@ def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
         if current in path:
             break
         
-
         if len(MAP[current]) == 2:
             if current != to:
                 manual.append("pass")
@@ -119,28 +96,45 @@ def route(fro,to, occupation:list[str],last_station=None,lasz_attempt=False):
                 if current == MAP[parent.get(current)][2]:
                     manual.append(1)
 
-
         path.append(current)
         current=parent.get(current)
 
-    if current is not None:
-        return route(fro,parent.get(current),occupation)
+    return path,manual
+
+
+def route(fro,to, occupation:list[str],last_station=None):
+   
+    path,manual = depth_first_search(fro,to,occupation,last_station)
+    path_force,manual_force = depth_first_search(fro,to,[],last_station)
 
     path.reverse()
     manual.reverse()
+    path_force.reverse()
+    manual_force.reverse()
 
-    for path_elem_index in range(len(path)-1):
-        path_elem=path[path_elem_index]
-        if path_elem in occupation:
-            path=path[:path_elem_index+1:]
-            break
-
+    if len(path_force) == 0:
+        raise Exception("No path found")
     
-    manual.pop(0)  ###TODO: REMOVE THIS IF THE STATION IS SHORT AND THE TRAIN MIGHT PASS IT
-
+    if False if path_force[1] in occupation else (True if len(path) == 0 else (len(path) - 3 >= len(path_force))):
+        path=path_force
+        manual=manual_force
+        for path_elem_index in range(len(path)-1):
+            path_elem=path[path_elem_index]
+            if path_elem in occupation:
+                path=path[:path_elem_index:]
+                break
+    
+    if len(path) == 0:
+        return False,False,False
+           
     direction=(0 if (MAP[fro][0] == last_station) ^ (MAP[path[0]][0] == path[1]) else 1) if len(MAP[path[0]]) == 2 else (0 if (MAP[fro][1] == last_station) ^ (MAP[path[0]][1] == path[1]) else 1)
+
+    if direction == 1:
+        manual.pop(0)
 
     return manual,direction,path
 
+
 if __name__ == "__main__":
-    print(route("sw1","st10",[],"st1"))
+    print(route("st1","st10",["sw2"],"sw1"))
+  

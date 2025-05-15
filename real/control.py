@@ -41,6 +41,7 @@ def is_next_a_turn(train=None,plan=None):
     if plan is None:
         plan,direction,ss=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
     
+
     if len(plan) == 0:
         return False
     decision=plan.pop(0)
@@ -61,7 +62,10 @@ def handle_station(train,msg):
             return
 
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
-        
+        if plan==False:
+            train.stop_driving()
+            return        
+
         if direction == 1:
             train.drive_at_speed(40,MovementDirection.INVERT)
             NEXT_STATION[train]=stations[0]
@@ -83,6 +87,9 @@ def handle_color_change(train,msg):
         LAST_STATTION[train]=POSITION[train]
         POSITION[train]=NEXT_STATION[train]
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
+        if plan==False:
+            train.stop_driving()
+            return  
         if direction == 1:
             train.drive_at_speed(40,MovementDirection.INVERT)
             NEXT_STATION[train]=stations[0]
