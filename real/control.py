@@ -12,9 +12,18 @@ from intelino.trainlib.enums import (
 import flask
 app=flask.Flask(__name__)
 
+import matplotlib.pyplot as plt
+import networkx as nx
+import io
 
 import navigate
 
+try:
+    with open("intelino/real/map.json","r") as f:
+        MAP=json.loads(f.read())
+except FileNotFoundError:
+    with open("real/map.json","r") as f:
+        MAP=json.loads(f.read())
 
 LAST_STATTION={} #train: str
 
@@ -185,6 +194,80 @@ def get_plans():
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
         plans[train_id] = stations
     return flask.jsonify(plans)
+
+@app.route('/web', methods=['GET'])
+def web():
+    """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live Image Fetch</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #111;
+    }
+    img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border: 4px solid #fff;
+    }
+  </style>
+</head>
+<body>
+  <img id="liveImage" src="/img" alt="Live Image">
+  <script>
+    const img = document.getElementById('liveImage');
+    setInterval(() => {
+      img.src = `/img?cache_bust=${Date.now()}`;
+    }, 1000);
+  </script>
+</body>
+</html>
+    """
+
+@app.route('/img', methods=['GET'])
+def img():
+    global POSITION, LAST_STATTION, DESTINATION, NEXT_STATION
+    G = nx.Graph()
+
+    for node, neighbors in MAP.items():
+        for neighbor in neighbors:
+            if neighbor:
+                G.add_edge(node, neighbor)
+
+    pos = nx.spring_layout(G, seed=42)
+
+    # Define custom coloring
+    highlight_nodes = {"sw1", "st1", "stsw"}
+    node_colors = ["red" if node in highlight_nodes else "skyblue" for node in G.nodes]
+
+    highlight_edges = {(POSITION.get(train), NEXT_STATION.get(train)) for train in POSITION.keys()}
+    # Normalize edges to sorted tuples (undirected graph)
+    highlight_edges = {tuple(sorted(e)) for e in highlight_edges}
+    edge_colors = ["red" if tuple(sorted(edge)) in highlight_edges else "gray" for edge in G.edges]
+
+    # Plot
+    plt.figure(figsize=(10, 8))
+    nx.draw(
+        G, pos, with_labels=True,
+        node_color=node_colors,
+        edge_color=edge_colors,
+        node_size=1000,
+        font_size=10
+    )
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    plt.close()
+
+    return flask.Response(buf.getvalue(), mimetype='image/png')
+
 
 @app.route('/')
 def index(): #returns a wabpage where you can see the train ids positions and destinations as well as the next stations, real time with 1 second refresh by fetching the data from the server
