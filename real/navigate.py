@@ -67,8 +67,8 @@ def depth_first_search(fro,to,occupation,last_station):
                 neighs.append(MAP[node][0])
 
         for neigh in neighs:
-            if f"{node}+{neigh}" not in visited:
-                visited.add(f"{node}+{neigh}")
+            if neigh not in visited:
+                visited.add(neigh)
                 parent[neigh] = node
                 que.append(neigh)
 
@@ -103,7 +103,8 @@ def depth_first_search(fro,to,occupation,last_station):
 
 
 def route(fro,to, occupation:list[str],last_station=None):
-   
+    if fro == to:
+        return False,False,False
     path,manual = depth_first_search(fro,to,occupation,last_station)
     path_force,manual_force = depth_first_search(fro,to,[],last_station)
 
@@ -115,22 +116,24 @@ def route(fro,to, occupation:list[str],last_station=None):
     if len(path_force) == 0:
         raise Exception("No path found")
     
-    if False if path_force[1] in occupation else (True if len(path) == 0 else (len(path) - 3 >= len(path_force))):
-        path=path_force
-        manual=manual_force
-        for path_elem_index in range(len(path)-1):
-            path_elem=path[path_elem_index]
-            if path_elem in occupation:
-                path=path[:path_elem_index:]
-                break
+    if not path==path_force:
+        if False if path_force[1] in occupation else (True if len(path) == 0 else (len(path) - 3 >= len(path_force))):
+            path=path_force
+            manual=manual_force
+            for path_elem_index in range(len(path)-1):
+                path_elem=path[path_elem_index]
+                if path_elem in occupation:
+                    path=path[:path_elem_index:]
+                    break
     
     if len(path) == 0:
         return False,False,False
            
     direction=(0 if (MAP[fro][0] == last_station) ^ (MAP[path[0]][0] == path[1]) else 1) if len(MAP[path[0]]) == 2 else (0 if (MAP[fro][1] == last_station) ^ (MAP[path[0]][1] == path[1]) else 1)
 
-    if direction == 1:
-        manual.pop(0)
+    
+    manual.pop(0)
+    
 
     return manual,direction,path
 

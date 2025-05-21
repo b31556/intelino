@@ -24,16 +24,16 @@ def do_after_arrival(train_id, waittime):
                 AT[train_id] = 0
         DESTINATIONS[train_id] = TIME_TABLES[train_id][AT[train_id]]
         print(f"[AFTER] {waittime}s passed since {train_id} arrived we go to {TIME_TABLES[train_id][AT[train_id]]}")
-        #requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[train_id][AT[train_id]])  # or maybe do something else
+        requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[train_id][AT[train_id]])  # or maybe do something else
 
 
 
 def main_loop():
     while True:
         
-        #position=requests.get("127.0.0.1:5080/get_positions").json()
+        position=requests.get("http://127.0.0.1:5080/get_positions").json()
         with data_lock:
-            position = DEBUG_POSITION.copy()
+            #position = DEBUG_POSITION.copy()
             for train_id, pos in TIME_TABLES.items():
                 if list(position.values())[int(train_id)] == DESTINATIONS[train_id]:
                     print(f"{train_id} arrived at {list(position.values())[int(train_id)]}")

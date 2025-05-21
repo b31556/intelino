@@ -33,6 +33,10 @@ POSITION={} # train: str
 
 NEXT_STATION={} # train: str
 
+MOVEMENT_DIRECTION={}
+
+IMMUNITY={}
+
 trains=[]
 
 
@@ -61,8 +65,11 @@ def handle_split(train,msg):
     pass
 
 def handle_station(train,msg):
+    global POSITION,DESTINATION,NEXT_STATION,LAST_STATTION,IMMUNITY,MOVEMENT_DIRECTION
+    if time.time() - IMMUNITY[train] < 2:
+        return
     if msg.colors[:3]==(C.WHITE,C.MAGENTA,C.WHITE) or msg.colors[:3]==(C.WHITE,C.BLACK,C.BLACK):
-        global POSITION,DESTINATION,NEXT_STATION,LAST_STATTION
+        
         LAST_STATTION[train]=POSITION[train]
         POSITION[train]=NEXT_STATION[train]
 
@@ -76,7 +83,9 @@ def handle_station(train,msg):
             return        
 
         if direction == 1:
-            train.drive_at_speed(40,MovementDirection.INVERT)
+            train.drive_at_speed(20,MovementDirection.INVERT)
+            MOVEMENT_DIRECTION[train] = not(MOVEMENT_DIRECTION[train])
+            IMMUNITY[train] = time.time()
             NEXT_STATION[train]=stations[0]
         else:
             NEXT_STATION[train]=stations[1]
@@ -100,7 +109,9 @@ def handle_color_change(train,msg):
             train.stop_driving()
             return  
         if direction == 1:
-            train.drive_at_speed(40,MovementDirection.INVERT)
+            train.drive_at_speed(20,MovementDirection.INVERT)
+            MOVEMENT_DIRECTION[train] = not(MOVEMENT_DIRECTION[train])
+            IMMUNITY[train] = time.time()
             NEXT_STATION[train]=stations[0]
         else:
             NEXT_STATION[train]=stations[1]
@@ -109,7 +120,7 @@ def handle_color_change(train,msg):
 
 
 def main():
-    global trains, POSITION, LAST_STATTION
+    global trains, POSITION, LAST_STATTION, MOVEMENT_DIRECTION
 
     train_count = 1
     blink_delay = 0.5  # in seconds
@@ -134,6 +145,7 @@ def main():
 
         POSITION[t] = posible_positions.pop(0)
         LAST_STATTION[t] = POSITION[t]
+        MOVEMENT_DIRECTION[t] = False
         print(f"train {t.id} position: {POSITION[t]}")
 
         
@@ -149,7 +161,9 @@ def set_plan(train_id:int,destination:str):
     NEXT_STATION[train] = stations[1]
     is_next_a_turn(train,plan)
     if direction != "KYS":
-        train.drive_at_speed(40,MovementDirection.FORWARD if direction==0 else MovementDirection.BACKWARD)
+        train.drive_at_speed(20,MovementDirection.FORWARD if (MOVEMENT_DIRECTION[train] if direction==0 else not(MOVEMENT_DIRECTION[train])) else MovementDirection.BACKWARD)
+        MOVEMENT_DIRECTION[train]=(MOVEMENT_DIRECTION[train] if direction==0 else not(MOVEMENT_DIRECTION[train]))
+        IMMUNITY[train] = time.time()
 
 @app.route('/set_plan/<train_id>', methods=['POST'])
 def receive_data(train_id):
