@@ -122,7 +122,7 @@ def handle_color_change(train,msg):
 def main():
     global trains, POSITION, LAST_STATTION, MOVEMENT_DIRECTION
 
-    train_count = 1
+    train_count = 2
     blink_delay = 0.5  # in seconds
 
     print("scanning and connecting...")
@@ -131,7 +131,7 @@ def main():
 
     print("connected train count:", len(trains_list))
 
-    posible_positions=["allkulon"]
+    posible_positions=["allkulon", "st7"]
 
     for t in trains_list:
         #t.drive_at_speed(random.randint(30,60))
@@ -146,7 +146,7 @@ def main():
         POSITION[t] = posible_positions.pop(0)
         LAST_STATTION[t] = POSITION[t]
         MOVEMENT_DIRECTION[t] = False
-        print(f"train {t.id} position: {POSITION[t]}")
+        print(f"train {t.alias} position: {POSITION[t]}")
 
         
 
