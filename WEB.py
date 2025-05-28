@@ -30,8 +30,11 @@ def do_after_arrival(train_id, waittime):
 
 def main_loop():
     while True:
-        
-        position=requests.get("http://127.0.0.1:5080/get_positions").json()
+        try:
+            position=requests.get("http://127.0.0.1:5080/get_positions").json()
+        except:
+            time.sleep(5)
+            continue
         with data_lock:
             #position = DEBUG_POSITION.copy()
             for train_id, pos in TIME_TABLES.items():

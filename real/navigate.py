@@ -21,6 +21,9 @@ def depth_first_search(fro,to,occupation,last_station):
 
     while que:
         node=que.popleft()
+        if node in occupation:
+            continue
+
         if node == to:
             sucess=True
             break
@@ -28,8 +31,7 @@ def depth_first_search(fro,to,occupation,last_station):
         if node == None:
             continue
 
-        if node in occupation:
-            continue
+        
 
         neighs=[]
 
@@ -126,7 +128,7 @@ def route(fro,to, occupation:list[str],last_station=None):
                     path=path[:path_elem_index:]
                     break
     
-    if len(path) == 0:
+    if len(path) == 0 or len(path) == 1:
         return False,False,False
            
     direction=(0 if (MAP[fro][0] == last_station) ^ (MAP[path[0]][0] == path[1]) else 1) if len(MAP[path[0]]) == 2 else (0 if (MAP[fro][1] == last_station) ^ (MAP[path[0]][1] == path[1]) else 1)

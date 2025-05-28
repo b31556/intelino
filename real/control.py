@@ -37,7 +37,18 @@ MOVEMENT_DIRECTION={}
 
 IMMUNITY={}
 
+TRAINS_IN_WATITING_LINE=[]
+
 trains=[]
+
+def process_que():
+    global TRAINS_IN_WATITING_LINE
+    if len(TRAINS_IN_WATITING_LINE) != 0:
+        for train in TRAINS_IN_WATITING_LINE:
+            set_plan(trains.index(train), DESTINATION[train])
+    else:
+        return
+    
 
 
 def make_occupation(train):
@@ -79,6 +90,8 @@ def handle_station(train,msg):
 
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
         if plan==False:
+            if train not in TRAINS_IN_WATITING_LINE:
+                TRAINS_IN_WATITING_LINE.append(train)
             train.stop_driving()
             return        
 
@@ -99,13 +112,17 @@ def handle_station(train,msg):
         
         is_next_a_turn(train,plan=plan)
 
+        process_que()
+
 def handle_color_change(train,msg):
     if msg.color == C.CYAN:
-        global POSITION,DESTINATION,NEXT_STATION,LAST_STATTION
+        global POSITION,DESTINATION,NEXT_STATION,LAST_STATTION,TRAINS_IN_WATITING_LINE
         LAST_STATTION[train]=POSITION[train]
         POSITION[train]=NEXT_STATION[train]
         plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
         if plan==False:
+            if train not in TRAINS_IN_WATITING_LINE:
+                TRAINS_IN_WATITING_LINE.append(train)
             train.stop_driving()
             return  
         if direction == 1:
@@ -117,7 +134,7 @@ def handle_color_change(train,msg):
             NEXT_STATION[train]=stations[1]
         is_next_a_turn(train,plan=plan)
          
-
+        process_que()
 
 def main():
     global trains, POSITION, LAST_STATTION, MOVEMENT_DIRECTION
@@ -131,7 +148,7 @@ def main():
 
     print("connected train count:", len(trains_list))
 
-    posible_positions=["allkulon", "st7"]
+    posible_positions=["park1", "park2"]
 
     for t in trains_list:
         #t.drive_at_speed(random.randint(30,60))
@@ -141,23 +158,34 @@ def main():
         t.set_snap_command_execution(False)
         t.set_snap_command_feedback(False,False)
         
-        trains.append(t)
+        #trains.append(t)
 
         POSITION[t] = posible_positions.pop(0)
         LAST_STATTION[t] = POSITION[t]
         MOVEMENT_DIRECTION[t] = False
         print(f"train {t.alias} position: {POSITION[t]}")
 
+    trains=[]
+    for key,_ in POSITION.items():
+        trains.append(key)
+
         
 
 
 def set_plan(train_id:int,destination:str):
     destination=destination.replace('"','')
-    global trains,DESTINATION,NEXT_STATION
+    global trains,DESTINATION,NEXT_STATION,TRAINS_IN_WATITING_LINE
     train=trains[int(train_id)]
+    if train in TRAINS_IN_WATITING_LINE:
+        TRAINS_IN_WATITING_LINE.remove(train)
     DESTINATION[train] = destination
     print(f"set plan for {train_id} from {POSITION[trains[train_id]]} to {destination}")
     plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])  ##### IMPLAMENT OCCUPATION
+    if not stations:
+        if train not in TRAINS_IN_WATITING_LINE:
+            TRAINS_IN_WATITING_LINE.append(train)
+        return
+        
     NEXT_STATION[train] = stations[1]
     is_next_a_turn(train,plan)
     if direction != "KYS":
