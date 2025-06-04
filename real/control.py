@@ -18,6 +18,8 @@ import io
 
 import navigate
 
+SPPEEEDDD=50
+
 try:
     with open("intelino/real/map.json","r") as f:
         MAP=json.loads(f.read())
@@ -65,11 +67,13 @@ def is_next_a_turn(train=None,plan=None):
     if plan is None:
         plan,direction,ss=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
     
-
+    print(plan)
     if len(plan) == 0:
         return False
     decision=plan.pop(0)
     if isinstance(decision,int):
+        print(decision)
+        time.sleep(0.5)
         train.set_next_split_steering_decision(SteeringDecision.LEFT if decision==0 else SteeringDecision.RIGHT)
     
 def handle_split(train,msg):
@@ -96,7 +100,7 @@ def handle_station(train,msg):
             return        
 
         if direction == 1:
-            train.drive_at_speed(20,MovementDirection.INVERT)
+            train.drive_at_speed(SPPEEEDDD,MovementDirection.INVERT)
             MOVEMENT_DIRECTION[train] = not(MOVEMENT_DIRECTION[train])
             IMMUNITY[train] = time.time()
             NEXT_STATION[train]=stations[0]
@@ -126,7 +130,7 @@ def handle_color_change(train,msg):
             train.stop_driving()
             return  
         if direction == 1:
-            train.drive_at_speed(20,MovementDirection.INVERT)
+            train.drive_at_speed(SPPEEEDDD,MovementDirection.INVERT)
             MOVEMENT_DIRECTION[train] = not(MOVEMENT_DIRECTION[train])
             IMMUNITY[train] = time.time()
             NEXT_STATION[train]=stations[0]
@@ -139,7 +143,7 @@ def handle_color_change(train,msg):
 def main():
     global trains, POSITION, LAST_STATTION, MOVEMENT_DIRECTION
 
-    train_count = 2
+    train_count = 1
     blink_delay = 0.5  # in seconds
 
     print("scanning and connecting...")
@@ -148,7 +152,7 @@ def main():
 
     print("connected train count:", len(trains_list))
 
-    posible_positions=["park1", "park2"]
+    posible_positions=["fo-1"]
 
     for t in trains_list:
         #t.drive_at_speed(random.randint(30,60))
@@ -189,7 +193,7 @@ def set_plan(train_id:int,destination:str):
     NEXT_STATION[train] = stations[1]
     is_next_a_turn(train,plan)
     if direction != "KYS":
-        train.drive_at_speed(20,MovementDirection.FORWARD if (MOVEMENT_DIRECTION[train] if direction==0 else not(MOVEMENT_DIRECTION[train])) else MovementDirection.BACKWARD)
+        train.drive_at_speed(SPPEEEDDD,MovementDirection.FORWARD if (MOVEMENT_DIRECTION[train] if direction==0 else not(MOVEMENT_DIRECTION[train])) else MovementDirection.BACKWARD)
         MOVEMENT_DIRECTION[train]=(MOVEMENT_DIRECTION[train] if direction==0 else not(MOVEMENT_DIRECTION[train]))
         IMMUNITY[train] = time.time()
 
