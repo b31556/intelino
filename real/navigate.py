@@ -2,15 +2,18 @@ from collections import deque
 import json
 
 
-try:
-    with open("intelino/real/map.json","r") as f:
-        MAP=json.loads(f.read())
-except FileNotFoundError:
-    with open("real/map.json","r") as f:
-        MAP=json.loads(f.read())
+
 
 
 def depth_first_search(fro,to,occupation,last_station):
+
+    try:
+        with open("intelino/real/map.json","r") as f:
+            MAP=json.loads(f.read())
+    except FileNotFoundError:
+        with open("real/map.json","r") as f:
+            MAP=json.loads(f.read())
+
     if fro==to:
         return [],[],[]
     que = deque([fro])
@@ -136,5 +139,5 @@ def route(fro,to, occupation:list[str],last_station=None):
 
 
 if __name__ == "__main__":
-    print(route("st1","st10",["sw2"],"sw1"))
+    print(route("fo-1","c-2",[],None))
   
