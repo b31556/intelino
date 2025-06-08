@@ -141,12 +141,12 @@ def route(fro,to, occupation:list[str],last_station=None):
            
     direction=(0 if (MAP[fro][0] == last_station) ^ (MAP[path[0]][0] == path[1]) else 1) if len(MAP[path[0]]) == 2 else (0 if (MAP[fro][1] == last_station) ^ (MAP[path[0]][1] == path[1]) else 1)
 
-    
+    manual.pop(0)
     
 
     return manual,direction,path
 
 
 if __name__ == "__main__":
-    print(route("fo-1","aa-1",[],None))
+    print(route("fo-1","c-2",[],None))
   
