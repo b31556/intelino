@@ -1,11 +1,30 @@
 import heapq
+import json
+import itertools
+counter = itertools.count()
 
+with open("bkk_menetrendek.json") as f:
+    f=json.load(f)
+    routes=f["megallok"]
+    departures=f["indulasok"]
+    timings=f["megallo_kesleltetes"]
+
+print("loaded datas")
+
+def time_to_minutes(t):
+    hours, minutes = map(int, t.split(":"))
+    return hours * 60 + minutes
+
+for line, ll in departures.items():
+    departures[line] = [time_to_minutes(t) for t in ll]
+
+print("time ref")
 # routes = {
 #     "161": ["A", "B", "C", "D", "E"],
 #     "97E": ["A", "E"],
 #     "46": ["C", "D","E"]
 # }
-routes = {
+"""routes = {
     "98":    ["A", "B", "C", "D"],
     "161":   ["C", "E", "F", "G", "H"],
     "97E":   ["A", "I", "J", "K", "L", "H"],
@@ -41,7 +60,7 @@ for bus, stops in routes.items():
     nx.draw_networkx_edges(G, pos, edgelist=edges, edge_color=[bus_colors[bus]], width=2, alpha=0.7, connectionstyle="arc3,rad=0.2")
 
 plt.savefig("bus_routes_colored.png", dpi=300)
-
+"""
 
 # make the bus routes circular
 for route in routes:
@@ -49,7 +68,7 @@ for route in routes:
     route_extension.reverse()
     route_extension=route_extension[1:]
     routes[route].extend(route_extension)
-departures = {
+"""departures = {
     "98": list(range(0, 60, 5)),
     "161": [3, 18, 33, 48],
     "97E": [10, 30, 50],
@@ -80,7 +99,7 @@ timings = {
     "69X": [0, 2, 4, 6, 8],
     "11": [0, 2, 4, 6, 8, 10],
     "500": [0, 3, 5, 7, 10],
-}
+}"""
 # help make the bus routes circular
 for bus in timings:
     times_extension=timings[bus].copy()
@@ -89,7 +108,7 @@ for bus in timings:
     times_extension=times_extension[1:]
     timings[bus].extend(times_extension)      
 
-
+print("prepdone")
 def get_buses(station,time):
     for bus,path in routes.items():
         if station in path:
@@ -100,11 +119,11 @@ def get_buses(station,time):
                     break
 
 def shortest_route(strttime,start, end):
-    heap = [(strttime, start, [], [])]  # (distance, current_station, path, bus history)
+    heap = [(strttime, 69, start, [], [])]  # (distance, current_station, path, bus history)
     visited = set()
     time=strttime
     while heap:
-        time, station, path, history = heapq.heappop(heap)
+        time, _, station, path, history = heapq.heappop(heap)
 
         if station == end:
             return path + [station], history, time-strttime
@@ -120,6 +139,7 @@ def shortest_route(strttime,start, end):
                     heapq.heappush(
                         heap,
                         (time + arrival + cost,
+                        next(counter),
                         stop,
                         path + [station],
                         history + [{bus: {station: time + arrival, stop: time+ arrival+cost}}])
@@ -128,7 +148,11 @@ def shortest_route(strttime,start, end):
     return None, [], None
 
 # Example usage
-stations, path, timetaken = shortest_route(20, "A", "Z")
+import time
+t=time.time()
+stations, path, timetaken = shortest_route(341, "Deák Ferenc tér M", "Rákoscsaba-Újtelep, Tóalmás utca")
+print(f"took {time.time()-t} secs")
+
 print("Shortest path based on station hops:")
 for p in path:
     bus = list(p.keys())[0]
