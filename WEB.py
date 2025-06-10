@@ -68,7 +68,7 @@ def get_trains():
     with data_lock:
         return flask.jsonify({
             "time_tables": TIME_TABLES,
-            "destinations": DESTINATIONS
+            "step": AT,
         })
 
 @app.route("/debug_setpos", methods=["POST"])
