@@ -172,180 +172,157 @@ def index():
     <!-- Container for all train containers -->
     <div id="trains" style="display: flex; flex-wrap: wrap;"></div>
     <script>
-        // Function to build a train container with its schedule and controls
-        function buildTrainContainer(trainId, schedule, step) {
-            const container = document.createElement('div');
-            container.className = 'train-container';
-            container.dataset.trainId = trainId;
+        // Build a train container (assumed existing function, included for clarity)
+function buildTrainContainer(trainId, schedule, step) {
+    const container = document.createElement('div');
+    container.className = 'train-container';
+    container.dataset.trainId = trainId;
 
-            // Train ID header
-            const header = document.createElement('h2');
-            header.textContent = `Train ${trainId}`;
-            container.appendChild(header);
+    const title = document.createElement('h2');
+    title.textContent = `Train ${trainId}`;
+    container.appendChild(title);
 
-            // Schedule list
-            const scheduleList = document.createElement('ul');
-            scheduleList.className = 'schedule-list';
+    const scheduleList = document.createElement('ul');
+    scheduleList.className = 'schedule-list';
+    schedule.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.textContent = `${item.stop} (${item.type})`;
+        if (index === step) li.classList.add('current-step');
+        scheduleList.appendChild(li);
+    });
+    container.appendChild(scheduleList);
 
-            if (schedule && schedule.length > 0) {
-                schedule.forEach((item, index) => {
-                    const li = document.createElement('li');
-                    if (typeof item === 'string') {
-                        li.dataset.type = 'station';
-                        li.dataset.value = item;
-                        li.textContent = `Station: ${item}`;
+    const select = document.createElement('select');
+    ['Station', 'Pass'].forEach(type => {
+        const option = document.createElement('option');
+        option.value = type;
+        option.textContent = type;
+        select.appendChild(option);
+    });
+    container.appendChild(select);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Enter stop name';
+    container.appendChild(input);
+
+    const addButton = document.createElement('button');
+    addButton.textContent = 'Add';
+    addButton.addEventListener('click', () => {
+        const stop = input.value.trim();
+        const type = select.value;
+        if (stop) {
+            const li = document.createElement('li');
+            li.textContent = `${stop} (${type})`;
+            scheduleList.appendChild(li);
+            input.value = '';
+        }
+    });
+    container.appendChild(addButton);
+
+    const updateButton = document.createElement('button');
+    updateButton.textContent = 'Update';
+    updateButton.addEventListener('click', () => {
+        const updatedSchedule = Array.from(scheduleList.querySelectorAll('li')).map(li => {
+            const [stop, type] = li.textContent.match(/(.+) \((.+)\)/).slice(1);
+            return { stop, type };
+        });
+        fetch(`/set_plan/${trainId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedSchedule),
+        }).then(response => {
+            if (response.ok) {
+                console.log(`Schedule for Train ${trainId} updated`);
+                rebuildTrainContainer(trainId); // Rebuild only this train
+            } else {
+                console.error('Failed to update schedule');
+            }
+        }).catch(error => console.error('Error:', error));
+    });
+    container.appendChild(updateButton);
+
+    const resetButton = document.createElement('button');
+    resetButton.textContent = 'Reset';
+    resetButton.addEventListener('click', () => rebuildTrainContainer(trainId));
+    container.appendChild(resetButton);
+
+    return container;
+}
+
+// Fetch train data and update the UI
+function fetchTrains(fullRebuild = false) {
+    fetch('/trains')
+        .then(response => response.json())
+        .then(data => {
+            const trainsDiv = document.getElementById('trains');
+            if (fullRebuild) {
+                trainsDiv.innerHTML = ''; // Clear and rebuild all
+                data.trains.forEach(trainId => {
+                    const schedule = data.time_tables[trainId] || [];
+                    const step = data.step[trainId] !== undefined ? data.step[trainId] : -1;
+                    const container = buildTrainContainer(trainId, schedule, step);
+                    trainsDiv.appendChild(container);
+                });
+            } else {
+                // Update steps and manage train additions/removals
+                const existingContainers = Array.from(trainsDiv.querySelectorAll('.train-container'));
+                const newTrainIds = data.trains;
+
+                // Remove trains no longer present
+                existingContainers.forEach(container => {
+                    if (!newTrainIds.includes(container.dataset.trainId)) {
+                        container.remove();
+                    }
+                });
+
+                // Add or update trains
+                newTrainIds.forEach(trainId => {
+                    const schedule = data.time_tables[trainId] || [];
+                    const step = data.step[trainId] !== undefined ? data.step[trainId] : -1;
+                    let container = existingContainers.find(c => c.dataset.trainId === trainId);
+                    if (!container) {
+                        // New train
+                        container = buildTrainContainer(trainId, schedule, step);
+                        trainsDiv.appendChild(container);
                     } else {
-                        li.dataset.type = 'wait';
-                        li.dataset.value = item;
-                        li.textContent = `Wait: ${item} min`;
+                        // Update step highlight only
+                        const scheduleList = container.querySelector('.schedule-list');
+                        const items = scheduleList.querySelectorAll('li');
+                        items.forEach(item => item.classList.remove('current-step'));
+                        if (step >= 0 && step < items.length) {
+                            items[step].classList.add('current-step');
+                        }
                     }
-                    if (index === step) {
-                        li.classList.add('current-step');
-                    }
-                    // Delete button for each item
-                    const deleteButton = document.createElement('button');
-                    deleteButton.textContent = 'x';
-                    deleteButton.addEventListener('click', () => li.remove());
-                    li.appendChild(deleteButton);
-                    scheduleList.appendChild(li);
                 });
             }
+        })
+        .catch(error => console.error('Error fetching trains:', error));
+}
 
-            container.appendChild(scheduleList);
-            // Make the schedule list sortable
-            new Sortable(scheduleList, { animation: 150 });
+// Rebuild a single train’s container
+function rebuildTrainContainer(trainId) {
+    fetch('/trains')
+        .then(response => response.json())
+        .then(data => {
+            const schedule = data.time_tables[trainId] || [];
+            const step = data.step[trainId] !== undefined ? data.step[trainId] : -1;
+            const newContainer = buildTrainContainer(trainId, schedule, step);
+            const oldContainer = document.querySelector(`.train-container[data-train-id="${trainId}"]`);
+            if (oldContainer) {
+                oldContainer.replaceWith(newContainer);
+            } else {
+                document.getElementById('trains').appendChild(newContainer);
+            }
+        })
+        .catch(error => console.error('Error rebuilding train:', error));
+}
 
-            // Add item section
-            const addItemDiv = document.createElement('div');
-            addItemDiv.className = 'add-item';
+// Initial load
+fetchTrains(true);
 
-            const typeSelect = document.createElement('select');
-            typeSelect.className = 'type-select';
-            typeSelect.innerHTML = `
-                <option value="station">Station</option>
-                <option value="wait">Wait Time</option>
-            `;
-
-            const stationInput = document.createElement('input');
-            stationInput.type = 'text';
-            stationInput.className = 'station-input';
-            stationInput.placeholder = 'Station name';
-
-            const waitInput = document.createElement('input');
-            waitInput.type = 'number';
-            waitInput.className = 'wait-input';
-            waitInput.placeholder = 'Wait time in minutes';
-            waitInput.style.display = 'none';
-
-            const addButton = document.createElement('button');
-            addButton.className = 'add-button';
-            addButton.textContent = 'Add';
-
-            addItemDiv.appendChild(typeSelect);
-            addItemDiv.appendChild(stationInput);
-            addItemDiv.appendChild(waitInput);
-            addItemDiv.appendChild(addButton);
-            container.appendChild(addItemDiv);
-
-            // Toggle input fields based on selection
-            typeSelect.addEventListener('change', () => {
-                if (typeSelect.value === 'station') {
-                    stationInput.style.display = 'block';
-                    waitInput.style.display = 'none';
-                } else {
-                    stationInput.style.display = 'none';
-                    waitInput.style.display = 'block';
-                }
-            });
-
-            // Add new item to the schedule
-            addButton.addEventListener('click', () => {
-                const type = typeSelect.value;
-                let value;
-                if (type === 'station') {
-                    value = stationInput.value.trim();
-                    if (!value) return; // Basic validation
-                } else {
-                    value = waitInput.value.trim();
-                    if (!value || isNaN(value)) return; // Basic validation
-                    value = parseInt(value, 10);
-                }
-                const li = document.createElement('li');
-                li.dataset.type = type;
-                li.dataset.value = value;
-                li.textContent = type === 'station' ? `Station: ${value}` : `Wait: ${value} min`;
-                const deleteButton = document.createElement('button');
-                deleteButton.textContent = 'x';
-                deleteButton.addEventListener('click', () => li.remove());
-                li.appendChild(deleteButton);
-                scheduleList.appendChild(li);
-                stationInput.value = '';
-                waitInput.value = '';
-            });
-
-            // Update button to send schedule to server
-            const updateButton = document.createElement('button');
-            updateButton.className = 'update-button';
-            updateButton.textContent = 'Update';
-            updateButton.addEventListener('click', () => {
-                const items = scheduleList.querySelectorAll('li');
-                const updatedSchedule = [];
-                items.forEach(item => {
-                    const type = item.dataset.type;
-                    const value = item.dataset.value;
-                    if (type === 'station') {
-                        updatedSchedule.push(value);
-                    } else {
-                        updatedSchedule.push(parseInt(value, 10));
-                    }
-                });
-                fetch(`/set_plan/${trainId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatedSchedule),
-                }).then(response => {
-                    if (response.ok) {
-                        console.log(`Schedule for Train ${trainId} updated`);
-                        fetchTrains(); // Refresh UI after update
-                    } else {
-                        console.error('Failed to update schedule');
-                    }
-                }).catch(error => console.error('Error:', error));
-            });
-            container.appendChild(updateButton);
-
-            // Reset button to reload server data
-            const resetButton = document.createElement('button');
-            resetButton.className = 'reset-button';
-            resetButton.textContent = 'Reset';
-            resetButton.addEventListener('click', fetchTrains);
-            container.appendChild(resetButton);
-
-            return container;
-        }
-
-        // Fetch train data and update the UI
-        function fetchTrains() {
-            fetch('/trains')
-                .then(response => response.json())
-                .then(data => {
-                    const trainsDiv = document.getElementById('trains');
-                    trainsDiv.innerHTML = ''; // Clear existing content
-                    data.trains.forEach(trainId => {
-                        const schedule = data.time_tables[trainId] || [];
-                        const step = data.step[trainId] !== undefined ? data.step[trainId] : -1;
-                        const container = buildTrainContainer(trainId, schedule, step);
-                        trainsDiv.appendChild(container);
-                    });
-                })
-                .catch(error => console.error('Error fetching trains:', error));
-        }
-
-        // Initialize the page and set up periodic syncing
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchTrains(); // Initial load
-            setInterval(fetchTrains, 5000); // Sync every 5 seconds
-        });
+// Periodic step updates (every 5 seconds)
+setInterval(() => fetchTrains(false), 5000);
     </script>
 </body>
 </html>
