@@ -11,6 +11,7 @@ TIME_TABLES = {}    # train_id: list[str]
 DESTINATIONS = {}   # train_id: str
 AT = {}           # train_id: int
 DEBUG_POSITION = {}  # train_id: str
+TRAINS= [] # list of train IDs eg 0 1 2 etc
 data_lock = threading.Lock()
 
 
@@ -37,6 +38,7 @@ def main_loop():
             continue
         with data_lock:
             #position = DEBUG_POSITION.copy()
+            TRAINS=list(position.keys())
             for train_id, pos in TIME_TABLES.items():
                 if list(position.values())[int(train_id)] == DESTINATIONS[train_id]:
                     print(f"{train_id} arrived at {list(position.values())[int(train_id)]}")
@@ -69,6 +71,7 @@ def get_trains():
         return flask.jsonify({
             "time_tables": TIME_TABLES,
             "step": AT,
+            "trains": TRAINS
         })
 
 @app.route("/debug_setpos", methods=["POST"])
