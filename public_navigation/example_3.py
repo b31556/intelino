@@ -37,9 +37,9 @@ print("time ref")
     "11":    ["AF", "AG", "AH", "AI", "AJ", "Z"],
     "500":   ["R", "K", "M", "V", "AJ"],
 }
-
+"""
 ### Show the routes with different bus colors
-import networkx as nx
+"""import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib
 
@@ -49,7 +49,7 @@ for bus, stops in routes.items():
         G.add_edge(stops[i], stops[i + 1], weight=1, bus=bus)
 
 pos = nx.spring_layout(G)
-nx.draw(G, pos, with_labels=True, node_size=200, node_color="skyblue", font_size=5, font_weight="bold")
+nx.draw(G, pos, with_labels=True, node_size=20, node_color="skyblue", font_size=1, font_weight="bold")
 
 # Assign unique colors to each bus route
 colors = plt.cm.tab20(range(len(routes)))
@@ -57,10 +57,10 @@ bus_colors = {bus: colors[i] for i, bus in enumerate(routes)}
 
 for bus, stops in routes.items():
     edges = [(stops[i], stops[i + 1]) for i in range(len(stops) - 1)]
-    nx.draw_networkx_edges(G, pos, edgelist=edges, edge_color=[bus_colors[bus]], width=2, alpha=0.7, connectionstyle="arc3,rad=0.2")
+    nx.draw_networkx_edges(G, pos, edgelist=edges, edge_color=[bus_colors[bus]], width=0.1, alpha=0.7, connectionstyle="arc3,rad=0.2")
 
-plt.savefig("bus_routes_colored.png", dpi=300)
-"""
+plt.savefig("bus_routes_colored.png", dpi=300)"""
+
 
 # make the bus routes circular
 for route in routes:
