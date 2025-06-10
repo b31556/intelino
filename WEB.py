@@ -11,7 +11,7 @@ TIME_TABLES = {}    # train_id: list[str]
 DESTINATIONS = {}   # train_id: str
 AT = {}           # train_id: int
 DEBUG_POSITION = {}  # train_id: str
-TRAINS= [] # list of train IDs eg 0 1 2 etc
+TRAINS= [0] # list of train IDs eg 0 1 2 etc
 data_lock = threading.Lock()
 
 
