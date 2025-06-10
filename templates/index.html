@@ -3,239 +3,443 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Train Control Frontend</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+    <title>Train Control Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Gilroy:wght@700&display=swap" rel="stylesheet">
     <style>
-        .train-container {
-            width: 300px;
-            margin: 10px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            display: flex;
-            flex-direction: column;
-            background-color: #fff;
+        body {
+            font-family: 'Inter', sans-serif;
         }
-        .schedule-list {
-            list-style: none;
-            padding: 0;
-            min-height: 20px;
+        h1, h2, h3 {
+            font-family: 'Gilroy', sans-serif;
         }
-        .schedule-list li {
-            padding: 5px;
-            margin: 2px 0;
-            background-color: #f0f0f0;
-            cursor: move;
-            position: relative;
+        .sortable-ghost {
+            opacity: 0.4;
+            background: #e0e0e0;
         }
-        .schedule-list li.current-step {
-            background-color: #ffff99;
+        .sortable-drag {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
-        .schedule-list li button {
-            position: absolute;
-            right: 5px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: red;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .add-item {
-            margin-top: 10px;
-            display: flex;
-            align-items: center;
-        }
-        .add-item select, .add-item input {
-            margin-right: 5px;
-        }
-        button {
-            margin-top: 5px;
-            padding: 5px 10px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #e0e0e0;
-        }
-        .global-sync-label {
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-        }
-        .global-sync-label input {
-            margin-right: 5px;
+        .theme-transition {
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
     </style>
 </head>
-<body>
-    <div class="global-sync-label">
-        <label>
-            <input type="checkbox" id="global-sync-switch" checked>
-            Auto-sync
-        </label>
-    </div>
-    <div id="trains" style="display: flex; flex-wrap: wrap;"></div>
-    <script>
-        // Function to build a train container
-        function buildTrainContainer(trainId, schedule, step) {
-            const container = document.createElement('div');
-            container.className = 'train-container';
-            container.dataset.trainId = trainId;
+<body className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 theme-transition">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
 
-            const header = document.createElement('h2');
-            header.textContent = `Train ${trainId}`;
-            container.appendChild(header);
+        const TrainCard = ({ trainId, schedule = [], step = -1, position, destination, followSchedule: initialFollowSchedule, onUpdate, isSyncing, setIsDragging, onToggleFollow }) => {
+            const [type, setType] = useState('station');
+            const [station, setStation] = useState('');
+            const [wait, setWait] = useState('');
+            const [localSchedule, setLocalSchedule] = useState(schedule.map((item, index) => ({
+                ...item,
+                id: `${item.type}-${item.value}-${index}-${Date.now()}`
+            })));
+            const [isDragging, setIsDraggingLocal] = useState(false);
+            const [followSchedule, setFollowSchedule] = useState(initialFollowSchedule);
+            const listRef = useRef(null);
+            const sortableRef = useRef(null);
 
-            const scheduleList = document.createElement('ul');
-            scheduleList.className = 'schedule-list';
-            if (schedule && schedule.length > 0) {
-                schedule.forEach((item, index) => {
-                    const li = document.createElement('li');
-                    if (typeof item === 'string') {
-                        li.dataset.type = 'station';
-                        li.dataset.value = item;
-                        li.textContent = `Station: ${item}`;
-                    } else {
-                        li.dataset.type = 'wait';
-                        li.dataset.value = item;
-                        li.textContent = `Wait: ${item} min`;
-                    }
-                    if (index === step) {
-                        li.classList.add('current-step');
-                    }
-                    const deleteButton = document.createElement('button');
-                    deleteButton.textContent = 'x';
-                    deleteButton.addEventListener('click', () => li.remove());
-                    li.appendChild(deleteButton);
-                    scheduleList.appendChild(li);
-                });
-            }
-            container.appendChild(scheduleList);
+            const isMoving = position && destination && position.toLowerCase() !== destination.toLowerCase();
 
-            // Make the schedule list sortable
-            new Sortable(scheduleList, { animation: 150 });
+            useEffect(() => {
+                setLocalSchedule(schedule.map((item, index) => ({
+                    ...item,
+                    id: `${item.type}-${item.value}-${index}-${Date.now()}`
+                })));
+            }, [schedule]);
 
-            // Add item section
-            const addItemDiv = document.createElement('div');
-            addItemDiv.className = 'add-item';
-
-            const typeSelect = document.createElement('select');
-            typeSelect.innerHTML = `
-                <option value="station">Station</option>
-                <option value="wait">Wait Time</option>
-            `;
-
-            const stationInput = document.createElement('input');
-            stationInput.type = 'text';
-            stationInput.placeholder = 'Station name';
-
-            const waitInput = document.createElement('input');
-            waitInput.type = 'number';
-            waitInput.placeholder = 'Wait time in minutes';
-            waitInput.style.display = 'none';
-
-            const addButton = document.createElement('button');
-            addButton.textContent = 'Add';
-
-            addItemDiv.appendChild(typeSelect);
-            addItemDiv.appendChild(stationInput);
-            addItemDiv.appendChild(waitInput);
-            addItemDiv.appendChild(addButton);
-            container.appendChild(addItemDiv);
-
-            typeSelect.addEventListener('change', () => {
-                if (typeSelect.value === 'station') {
-                    stationInput.style.display = 'block';
-                    waitInput.style.display = 'none';
-                } else {
-                    stationInput.style.display = 'none';
-                    waitInput.style.display = 'block';
-                }
-            });
-
-            addButton.addEventListener('click', () => {
-                const type = typeSelect.value;
-                let value;
-                if (type === 'station') {
-                    value = stationInput.value.trim();
-                    if (!value) return;
-                } else {
-                    value = waitInput.value.trim();
-                    if (!value || isNaN(value)) return;
-                    value = parseInt(value, 10);
-                }
-                const li = document.createElement('li');
-                li.dataset.type = type;
-                li.dataset.value = value;
-                li.textContent = type === 'station' ? `Station: ${value}` : `Wait: ${value} min`;
-                const deleteButton = document.createElement('button');
-                deleteButton.textContent = 'x';
-                deleteButton.addEventListener('click', () => li.remove());
-                li.appendChild(deleteButton);
-                scheduleList.appendChild(li);
-                stationInput.value = '';
-                waitInput.value = '';
-            });
-
-            // Update button to save changes to the server
-            const updateButton = document.createElement('button');
-            updateButton.textContent = 'Update';
-            updateButton.addEventListener('click', () => {
-                const items = scheduleList.querySelectorAll('li');
-                const updatedSchedule = [];
-                items.forEach(item => {
-                    const type = item.dataset.type;
-                    const value = item.dataset.value;
-                    if (type === 'station') {
-                        updatedSchedule.push(value);
-                    } else {
-                        updatedSchedule.push(parseInt(value, 10));
-                    }
-                });
-                fetch(`/set_plan/${trainId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatedSchedule),
-                }).then(response => {
-                    if (response.ok) {
-                        console.log(`Schedule for Train ${trainId} updated`);
-                    } else {
-                        console.error('Failed to update schedule');
-                    }
-                }).catch(error => console.error('Error:', error));
-            });
-            container.appendChild(updateButton);
-
-            return container;
-        }
-
-        // Function to fetch train data and update the UI
-        function fetchTrains() {
-            fetch('/trains')
-                .then(response => response.json())
-                .then(data => {
-                    const trainsDiv = document.getElementById('trains');
-                    trainsDiv.innerHTML = ''; // Clear and rebuild the UI
-                    data.trains.forEach(trainId => {
-                        const schedule = data.time_tables[trainId] || [];
-                        const step = data.step[trainId] !== undefined ? data.step[trainId] : -1;
-                        const container = buildTrainContainer(trainId, schedule, step);
-                        trainsDiv.appendChild(container);
+            useEffect(() => {
+                if (listRef.current) {
+                    sortableRef.current = new Sortable(listRef.current, {
+                        animation: 150,
+                        ghostClass: 'sortable-ghost',
+                        dragClass: 'sortable-drag',
+                        onStart: () => {
+                            setIsDraggingLocal(true);
+                            setIsDragging(true);
+                        },
+                        onEnd: (evt) => {
+                            setIsDraggingLocal(false);
+                            setIsDragging(false);
+                            const newSchedule = [...localSchedule];
+                            const [movedItem] = newSchedule.splice(evt.oldIndex, 1);
+                            newSchedule.splice(evt.newIndex, 0, movedItem);
+                            setLocalSchedule(newSchedule);
+                            onUpdate(trainId, newSchedule);
+                        },
                     });
-                })
-                .catch(error => console.error('Error fetching trains:', error));
-        }
-
-        // Initialize the page and set up periodic syncing
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchTrains(); // Initial fetch to load data
-            setInterval(() => {
-                const globalSyncSwitch = document.getElementById('global-sync-switch');
-                if (globalSyncSwitch.checked) {
-                    fetchTrains(); // Fetch only if the switch is on
                 }
-            }, 500);
-        });
+                return () => {
+                    if (sortableRef.current) {
+                        sortableRef.current.destroy();
+                    }
+                };
+            }, [trainId, onUpdate, setIsDragging]);
+
+            const handleAdd = () => {
+                if (type === 'station' && !station.trim()) return;
+                if (type === 'wait' && (!wait.trim() || isNaN(wait))) return;
+
+                const value = type === 'station' ? station : parseInt(wait, 10);
+                const newItem = { type, value, id: `${type}-${value}-${Date.now()}` };
+                const newSchedule = [...localSchedule, newItem];
+                setLocalSchedule(newSchedule);
+                onUpdate(trainId, newSchedule);
+                setStation('');
+                setWait('');
+            };
+
+            const handleDelete = (index) => {
+                const newSchedule = localSchedule.filter((_, i) => i !== index);
+                setLocalSchedule(newSchedule);
+                onUpdate(trainId, newSchedule);
+            };
+
+            const handleSave = async () => {
+                const saveName = prompt('Enter a name for the save:');
+                if (!saveName || !saveName.trim()) return;
+
+                try {
+                    const response = await fetch(`/save/${encodeURIComponent(saveName)}/${trainId}`, {
+                        method: 'GET',
+                    });
+                    if (response.ok) {
+                        console.log(`Schedule for Train ${trainId} saved as ${saveName}`);
+                    } else {
+                        console.error('Failed to save schedule');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            };
+
+            const handleLoad = async () => {
+                const saveName = prompt('Enter the name of the save to load:');
+                if (!saveName || !saveName.trim()) return;
+
+                try {
+                    const response = await fetch(`/load/${encodeURIComponent(saveName)}/${trainId}`, {
+                        method: 'GET',
+                    });
+                    if (response.ok) {
+                        const loadedSchedule = await response.json();
+                        const newSchedule = loadedSchedule.map((item, index) => ({
+                            type: typeof item === 'string' ? 'station' : 'wait',
+                            value: item,
+                            id: `${typeof item === 'string' ? 'station' : 'wait'}-${item}-${index}-${Date.now()}`
+                        }));
+                        setLocalSchedule(newSchedule);
+                        onUpdate(trainId, newSchedule);
+                        console.log(`Schedule for Train ${trainId} loaded from ${saveName}`);
+                    } else {
+                        console.error('Failed to load schedule');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            };
+
+            const handleSendTo = async () => {
+                const dest = prompt('Enter destination:');
+                if (!dest || !dest.trim()) return;
+
+                try {
+                    const response = await fetch(`/send/${trainId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dest),
+                    });
+                    if (response.ok) {
+                        console.log(`Train ${trainId} sent to ${dest}`);
+                    } else {
+                        console.error('Failed to send train');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            };
+
+            const handleToggleFollow = async () => {
+                const newState = !followSchedule;
+                try {
+                    const response = await fetch(`/toggle/${trainId}/${newState ? 'on' : 'off'}`, {
+                        method: 'GET',
+                    });
+                    if (response.ok) {
+                        setFollowSchedule(newState);
+                        onToggleFollow(trainId, newState);
+                        console.log(`Follow schedule for Train ${trainId} set to ${newState ? 'on' : 'off'}`);
+                    } else {
+                        console.error('Failed to toggle follow schedule');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            };
+
+            return (
+                <div className={`rounded-xl shadow-lg p-6 m-4 w-full max-w-sm transform transition-all duration-200 ${
+                    isMoving ? 'bg-teal-100 dark:bg-teal-800' : 'bg-white dark:bg-gray-800'
+                }`}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Train {trainId}</h2>
+                        <div className="flex items-center space-x-2">
+                            <button
+                                onClick={handleSendTo}
+                                className="bg-indigo-600 text-white text-sm font-medium px-2 py-1 rounded-lg hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-all duration-200"
+                                title="Send to destination"
+                            >
+                                Send
+                            </button>
+                            <label className="flex items-center space-x-1 text-sm text-gray-900 dark:text-gray-100">
+                                <input
+                                    type="checkbox"
+                                    checked={followSchedule}
+                                    onChange={handleToggleFollow}
+                                    className="form-checkbox h-4 w-4 text-teal-500 dark:text-teal-400"
+                                />
+                                <span>Follow</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div className="mb-4 text-sm text-gray-700 dark:text-gray-300">
+                        <p><span className="font-semibold">Position:</span> {position || 'Unknown'}</p>
+                        <p><span className="font-semibold">Destination:</span> {destination || 'None'}</p>
+                    </div>
+                    <ul ref={listRef} className="space-y-2 min-h-[100px]">
+                        {localSchedule.map((item, index) => (
+                            <li
+                                key={item.id}
+                                className={`p-3 rounded-lg flex justify-between items-center ${
+                                    index === step ? 'bg-yellow-200 dark:bg-yellow-600' : 'bg-gray-100 dark:bg-gray-700'
+                                } transition-all duration-200 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-move`}
+                            >
+                                <span className="text-gray-900 dark:text-gray-100">{item.type === 'station' ? item.value : `Wait: ${item.value} min`}</span>
+                                <button
+                                    onClick={() => handleDelete(index)}
+                                    className="text-red-500 hover:text-red-400 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                >
+                                    ✕
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                    <div className="mt-4 flex flex-col space-y-2">
+                        <select
+                            value={type}
+                            onChange={(e) => setType(e.target.value)}
+                            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 dark:focus:ring-teal-400"
+                        >
+                            <option value="station">Station</option>
+                            <option value="wait">Wait Time</option>
+                        </select>
+                        {type === 'station' ? (
+                            <input
+                                type="text"
+                                value={station}
+                                onChange={(e) => setStation(e.target.value)}
+                                placeholder="Station name"
+                                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 dark:focus:ring-teal-400"
+                            />
+                        ) : (
+                            <input
+                                type="number"
+                                value={wait}
+                                onChange={(e) => setWait(e.target.value)}
+                                placeholder="Wait time in minutes"
+                                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 dark:focus:ring-teal-400"
+                            />
+                        )}
+                        <button
+                            onClick={handleAdd}
+                            className="bg-teal-500 text-white p-2 rounded-lg hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-700 transition-all duration-200"
+                        >
+                            Add
+                        </button>
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={handleSave}
+                                className="bg-green-500 text-white p-2 rounded-lg hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 transition-all duration-200 flex-1"
+                            >
+                                Save
+                            </button>
+                            <button
+                                onClick={handleLoad}
+                                className="bg-purple-500 text-white p-2 rounded-lg hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700 transition-all duration-200 flex-1"
+                            >
+                                Load
+                            </button>
+                        </div>
+                        <button
+                            onClick={() => onUpdate(trainId, localSchedule)}
+                            className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 transition-all duration-200"
+                        >
+                            Update
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [trains, setTrains] = useState([]);
+            const [connected, setConnected] = useState(false);
+            const [sync, setSync] = useState(true);
+            const [theme, setTheme] = useState('light');
+            const [search, setSearch] = useState('');
+            const [isAnyDragging, setIsAnyDragging] = useState(false);
+
+            useEffect(() => {
+                const fetchTrains = async () => {
+                    if (isAnyDragging) return;
+                    try {
+                        const response = await fetch('/trains');
+                        const data = await response.json();
+                        setConnected(data.connected);
+                        setTrains(data.trains.map(id => ({
+                            id,
+                            schedule: (data.time_tables[id] || []).map((item, index) => ({
+                                type: typeof item === 'string' ? 'station' : 'wait',
+                                value: item,
+                                id: `${typeof item === 'string' ? 'station' : 'wait'}-${item}-${index}-${Date.now()}`
+                            })),
+                            step: data.step[id] !== undefined ? data.step[id] : -1,
+                            position: data.positions ? data.positions[id] : null,
+                            destination: data.destinations ? data.destinations[id] : null,
+                            followSchedule: data.follow_schedule ? data.follow_schedule[id] : true
+                        })));
+                    } catch (error) {
+                        console.error('Error fetching trains:', error);
+                    }
+                };
+
+                fetchTrains();
+                const interval = setInterval(() => {
+                    if (sync) fetchTrains();
+                }, 1000);
+
+                return () => clearInterval(interval);
+            }, [sync, isAnyDragging]);
+
+            useEffect(() => {
+                const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                setTheme(mediaQuery.matches ? 'dark' : 'light');
+                const handleChange = () => setTheme(mediaQuery.matches ? 'dark' : 'light');
+                mediaQuery.addEventListener('change', handleChange);
+                return () => mediaQuery.removeEventListener('change', handleChange);
+            }, []);
+
+            useEffect(() => {
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }, [theme]);
+
+            const toggleTheme = () => {
+                setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+            };
+
+            const handleUpdate = async (trainId, schedule) => {
+                try {
+                    const updatedSchedule = schedule.map(item =>
+                        item.type === 'station' ? item.value : parseInt(item.value, 10)
+                    );
+                    const response = await fetch(`/set_plan/${trainId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updatedSchedule),
+                    });
+                    if (!response.ok) console.error('Failed to update schedule');
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            };
+
+            const handleToggleFollow = (trainId, newState) => {
+                setTrains(prev => prev.map(item =>
+                    item.id === trainId ? { ...item, followSchedule: newState } : item
+                ));
+            };
+
+            const filteredTrains = trains.filter(train =>
+                train.id.toString().includes(search) ||
+                train.schedule.some(item => item.value.toString().toLowerCase().includes(search.toLowerCase())) ||
+                (train.position && train.position.toLowerCase().includes(search.toLowerCase())) ||
+                (train.destination && train.destination.toLowerCase().includes(search.toLowerCase()))
+            );
+
+            return (
+                <div className="min-h-screen p-6 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Train Control Dashboard</h1>
+                            <div className="flex items-center space-x-4">
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search trains, stations, or destinations..."
+                                    className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 dark:focus:ring-teal-400"
+                                />
+                                <label className="flex items-center space-x-2 text-gray-900 dark:text-gray-100">
+                                    <input
+                                        type="checkbox"
+                                        checked={sync}
+                                        onChange={() => setSync(!sync)}
+                                        className="form-checkbox h-5 w-5 text-teal-500 dark:text-teal-400"
+                                    />
+                                    <span>Auto-sync</span>
+                                </label>
+                                <button
+                                    onClick={toggleTheme}
+                                    className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                                    title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                                >
+                                    {theme === 'light' ? '🌙' : '☀️'}
+                                </button>
+                            </div>
+                        </div>
+                        <p className="mb-6 text-gray-700 dark:text-gray-300">
+                            {sync ? (
+                                connected ? 'Connected to control server' : 'Disconnected from control server'
+                            ) : (
+                                'Auto-sync is off'
+                            )}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredTrains.map(train => (
+                                <TrainCard
+                                    key={train.id}
+                                    trainId={train.id}
+                                    schedule={train.schedule}
+                                    step={train.step}
+                                    position={train.position}
+                                    destination={train.destination}
+                                    followSchedule={train.followSchedule}
+                                    onUpdate={handleUpdate}
+                                    isSyncing={sync && !isAnyDragging}
+                                    setIsDragging={setIsAnyDragging}
+                                    onToggleFollow={handleToggleFollow}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
 </html>

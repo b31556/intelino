@@ -69,7 +69,7 @@ def depth_first_search(fro,to,occupation,last_station):
                 neighs.append(MAP[node][1])
             else:
                 neighs.append(MAP[node][0])
-
+                ##? i love niki !
         for neigh in neighs:
             if neigh not in visited:
                 visited.add(neigh)
