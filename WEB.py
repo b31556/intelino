@@ -97,214 +97,259 @@ def set_plan(train_id):
 
 @app.route("/", methods=["GET"])
 def index():
-    return """<!DOCTYPE html>
+    return """
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Train Schedule Manager</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
-    <script src="https://unpkg.com/react-beautiful-dnd@13.1.1/dist/react-beautiful-dnd.min.js"></script>
-</head>
-<body>
-    <div id="root" class="min-h-screen bg-gray-100"></div>
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        const { DragDropContext, Droppable, Draggable } = ReactBeautifulDnd;
-
-        function App() {
-            const [trains, setTrains] = useState({});
-            const [newTrainId, setNewTrainId] = useState('');
-            const [newStation, setNewStation] = useState('');
-            const [newWaitTime, setNewWaitTime] = useState('');
-            const [schedules, setSchedules] = useState({});
-            const [positions, setPositions] = useState({});
-
-            // Fetch train data on mount and periodically
-            useEffect(() => {
-                const fetchTrains = async () => {
-                    try {
-                        const response = await fetch('http://localhost:9998/trains');
-                        const data = await response.json();
-                        setTrains(data);
-                    } catch (error) {
-                        console.error('Error fetching trains:', error);
-                    }
-                };
-                fetchTrains();
-                const interval = setInterval(fetchTrains, 5000);
-                return () => clearInterval(interval);
-            }, []);
-
-            // Handle adding a new train
-            const addTrain = () => {
-                if (newTrainId && !schedules[newTrainId]) {
-                    setSchedules({ ...schedules, [newTrainId]: [] });
-                    setNewTrainId('');
-                }
-            };
-
-            // Handle adding a station or wait time to a train's schedule
-            const addScheduleItem = (trainId) => {
-                if (newStation || newWaitTime) {
-                    const item = newWaitTime ? parseInt(newWaitTime) : newStation;
-                    if (item) {
-                        setSchedules({
-                            ...schedules,
-                            [trainId]: [...(schedules[trainId] || []), item]
-                        });
-                        setNewStation('');
-                        setNewWaitTime('');
-                    }
-                }
-            };
-
-            // Handle drag and drop
-            const onDragEnd = (result, trainId) => {
-                if (!result.destination) return;
-                const items = Array.from(schedules[trainId] || []);
-                const [reorderedItem] = items.splice(result.source.index, 1);
-                items.splice(result.destination.index, 0, reorderedItem);
-                setSchedules({ ...schedules, [trainId]: items });
-            };
-
-            // Submit schedule to backend
-            const submitSchedule = async (trainId) => {
-                try {
-                    const response = await fetch(`http://localhost:9998/set_plan/${trainId}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(schedules[trainId])
-                    });
-                    const data = await response.json();
-                    alert(data.message);
-                } catch (error) {
-                    console.error('Error submitting schedule:', error);
-                    alert('Failed to submit schedule');
-                }
-            };
-
-            // Debug: Set train position
-            const setDebugPosition = async (trainId, position) => {
-                try {
-                    const response = await fetch('http://localhost:9998/debug_setpos', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ [trainId]: position })
-                    });
-                    const data = await response.json();
-                    setPositions({ ...positions, [trainId]: position });
-                    alert(data.message);
-                } catch (error) {
-                    console.error('Error setting position:', error);
-                    alert('Failed to set position');
-                }
-            };
-
-            return (
-                <div className="container mx-auto p-4">
-                    <h1 className="text-3xl font-bold mb-4">Train Schedule Manager</h1>
-                    
-                    {/* Add New Train */}
-                    <div className="mb-6">
-                        <h2 className="text-xl font-semibold mb-2">Add New Train</h2>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={newTrainId}
-                                onChange={(e) => setNewTrainId(e.target.value)}
-                                placeholder="Train ID"
-                                className="border p-2 rounded"
-                            />
-                            <button
-                                onClick={addTrain}
-                                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                            >
-                                Add Train
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Train Schedules */}
-                    {Object.keys(schedules).map((trainId) => (
-                        <div key={trainId} className="mb-6 p-4 bg-white rounded shadow">
-                            <h2 className="text-xl font-semibold mb-2">Train {trainId}</h2>
-                            
-                            {/* Add Station/Wait Time */}
-                            <div className="flex gap-2 mb-4">
-                                <input
-                                    type="text"
-                                    value={newStation}
-                                    onChange={(e) => setNewStation(e.target.value)}
-                                    placeholder="Station Name"
-                                    className="border p-2 rounded"
-                                />
-                                <input
-                                    type="number"
-                                    value={newWaitTime}
-                                    onChange={(e) => setNewWaitTime(e.target.value)}
-                                    placeholder="Wait Time (seconds)"
-                                    className="border p-2 rounded"
-                                />
-                                <button
-                                    onClick={() => addScheduleItem(trainId)}
-                                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                                >
-                                    Add Item
-                                </button>
-                            </div>
-
-                            {/* Drag and Drop Schedule */}
-                            <DragDropContext onDragEnd={(result) => onDragEnd(result, trainId)}>
-                                <Droppable droppableId={trainId}>
-                                    {(provided) => (
-                                        <div
-                                            {...provided.droppableProps}
-                                            ref={provided.innerRef}
-                                            className="bg-gray-100 p-4 rounded min-h-[100px]"
-                                        >
-                                            {schedules[trainId].map((item, index) => (
-                                                <Draggable key={`${trainId}-${index}`} draggableId={`${trainId}-${index}`} index={index}>
-                                                    {(provided) => (
-                                                        <div
-                                                            ref={provided.innerRef}
-                                                            {...provided.draggableProps}
-                                                            {...provided.dragHandleProps}
-                                                            className="bg-white p-2 mb-2 rounded shadow"
-                                                        >
-                                                            {typeof item === 'number' ? `${item} seconds` : item}
-                                                        </div>
-                                                    )}
-                                                </Draggable>
-                                            ))}
-                                            {provided.placeholder}
-                                        </div>
-                                    )}
-                                </Droppable>
-                            </DragDropContext>
-
-                            {/* Submit Schedule */}
-                            <button
-                                onClick={() => submitSchedule(trainId)}
-                                className="mt-4 bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600"
-                            >
-                                Submit Schedule for Train {trainId}
-                            </button>
-
-                            
-                        </div>
-                    ))}
-                </div>
-            );
+    <title>Train Control Frontend</title>
+    <!-- Include SortableJS for drag-and-drop functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+    <style>
+        .train-container {
+            width: 300px;
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
         }
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        .schedule-list {
+            list-style: none;
+            padding: 0;
+            min-height: 20px; /* Ensures empty lists are visible for dragging */
+        }
+
+        .schedule-list li {
+            padding: 5px;
+            margin: 2px 0;
+            background-color: #f0f0f0;
+            cursor: move;
+            position: relative;
+        }
+
+        .schedule-list li.current-step {
+            background-color: #ffff99; /* Highlight for current step */
+        }
+
+        .schedule-list li button {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: red;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .add-item {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .add-item select, .add-item input {
+            margin-right: 5px;
+        }
+
+        button {
+            margin-top: 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Container for all train containers -->
+    <div id="trains" style="display: flex; flex-wrap: wrap;"></div>
+    <script>
+        // Function to build a train container with its schedule and controls
+        function buildTrainContainer(trainId, schedule, step) {
+            const container = document.createElement('div');
+            container.className = 'train-container';
+            container.dataset.trainId = trainId;
+
+            // Train ID header
+            const header = document.createElement('h2');
+            header.textContent = `Train ${trainId}`;
+            container.appendChild(header);
+
+            // Schedule list
+            const scheduleList = document.createElement('ul');
+            scheduleList.className = 'schedule-list';
+
+            if (schedule && schedule.length > 0) {
+                schedule.forEach((item, index) => {
+                    const li = document.createElement('li');
+                    if (typeof item === 'string') {
+                        li.dataset.type = 'station';
+                        li.dataset.value = item;
+                        li.textContent = `Station: ${item}`;
+                    } else {
+                        li.dataset.type = 'wait';
+                        li.dataset.value = item;
+                        li.textContent = `Wait: ${item} min`;
+                    }
+                    if (index === step) {
+                        li.classList.add('current-step');
+                    }
+                    // Delete button for each item
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'x';
+                    deleteButton.addEventListener('click', () => li.remove());
+                    li.appendChild(deleteButton);
+                    scheduleList.appendChild(li);
+                });
+            }
+
+            container.appendChild(scheduleList);
+            // Make the schedule list sortable
+            new Sortable(scheduleList, { animation: 150 });
+
+            // Add item section
+            const addItemDiv = document.createElement('div');
+            addItemDiv.className = 'add-item';
+
+            const typeSelect = document.createElement('select');
+            typeSelect.className = 'type-select';
+            typeSelect.innerHTML = `
+                <option value="station">Station</option>
+                <option value="wait">Wait Time</option>
+            `;
+
+            const stationInput = document.createElement('input');
+            stationInput.type = 'text';
+            stationInput.className = 'station-input';
+            stationInput.placeholder = 'Station name';
+
+            const waitInput = document.createElement('input');
+            waitInput.type = 'number';
+            waitInput.className = 'wait-input';
+            waitInput.placeholder = 'Wait time in minutes';
+            waitInput.style.display = 'none';
+
+            const addButton = document.createElement('button');
+            addButton.className = 'add-button';
+            addButton.textContent = 'Add';
+
+            addItemDiv.appendChild(typeSelect);
+            addItemDiv.appendChild(stationInput);
+            addItemDiv.appendChild(waitInput);
+            addItemDiv.appendChild(addButton);
+            container.appendChild(addItemDiv);
+
+            // Toggle input fields based on selection
+            typeSelect.addEventListener('change', () => {
+                if (typeSelect.value === 'station') {
+                    stationInput.style.display = 'block';
+                    waitInput.style.display = 'none';
+                } else {
+                    stationInput.style.display = 'none';
+                    waitInput.style.display = 'block';
+                }
+            });
+
+            // Add new item to the schedule
+            addButton.addEventListener('click', () => {
+                const type = typeSelect.value;
+                let value;
+                if (type === 'station') {
+                    value = stationInput.value.trim();
+                    if (!value) return; // Basic validation
+                } else {
+                    value = waitInput.value.trim();
+                    if (!value || isNaN(value)) return; // Basic validation
+                    value = parseInt(value, 10);
+                }
+                const li = document.createElement('li');
+                li.dataset.type = type;
+                li.dataset.value = value;
+                li.textContent = type === 'station' ? `Station: ${value}` : `Wait: ${value} min`;
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'x';
+                deleteButton.addEventListener('click', () => li.remove());
+                li.appendChild(deleteButton);
+                scheduleList.appendChild(li);
+                stationInput.value = '';
+                waitInput.value = '';
+            });
+
+            // Update button to send schedule to server
+            const updateButton = document.createElement('button');
+            updateButton.className = 'update-button';
+            updateButton.textContent = 'Update';
+            updateButton.addEventListener('click', () => {
+                const items = scheduleList.querySelectorAll('li');
+                const updatedSchedule = [];
+                items.forEach(item => {
+                    const type = item.dataset.type;
+                    const value = item.dataset.value;
+                    if (type === 'station') {
+                        updatedSchedule.push(value);
+                    } else {
+                        updatedSchedule.push(parseInt(value, 10));
+                    }
+                });
+                fetch(`/set_plan/${trainId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedSchedule),
+                }).then(response => {
+                    if (response.ok) {
+                        console.log(`Schedule for Train ${trainId} updated`);
+                        fetchTrains(); // Refresh UI after update
+                    } else {
+                        console.error('Failed to update schedule');
+                    }
+                }).catch(error => console.error('Error:', error));
+            });
+            container.appendChild(updateButton);
+
+            // Reset button to reload server data
+            const resetButton = document.createElement('button');
+            resetButton.className = 'reset-button';
+            resetButton.textContent = 'Reset';
+            resetButton.addEventListener('click', fetchTrains);
+            container.appendChild(resetButton);
+
+            return container;
+        }
+
+        // Fetch train data and update the UI
+        function fetchTrains() {
+            fetch('/trains')
+                .then(response => response.json())
+                .then(data => {
+                    const trainsDiv = document.getElementById('trains');
+                    trainsDiv.innerHTML = ''; // Clear existing content
+                    data.trains.forEach(trainId => {
+                        const schedule = data.time_tables[trainId] || [];
+                        const step = data.step[trainId] !== undefined ? data.step[trainId] : -1;
+                        const container = buildTrainContainer(trainId, schedule, step);
+                        trainsDiv.appendChild(container);
+                    });
+                })
+                .catch(error => console.error('Error fetching trains:', error));
+        }
+
+        // Initialize the page and set up periodic syncing
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchTrains(); // Initial load
+            setInterval(fetchTrains, 5000); // Sync every 5 seconds
+        });
     </script>
 </body>
-</html>"""
+</html>
+"""
 
 if __name__ == "__main__":
     thread = threading.Thread(target=main_loop, daemon=True)
