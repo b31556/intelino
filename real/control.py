@@ -120,6 +120,8 @@ def handle_station(train,msg):
 
 def handle_color_change(train,msg):
     if msg.color == C.CYAN:
+        if time.time() - IMMUNITY[train] < 2:
+            return
         global POSITION,DESTINATION,NEXT_STATION,LAST_STATTION,TRAINS_IN_WATITING_LINE
         LAST_STATTION[train]=POSITION[train]
         POSITION[train]=NEXT_STATION[train]
@@ -133,7 +135,7 @@ def handle_color_change(train,msg):
             train.drive_at_speed(SPPEEEDDD,MovementDirection.INVERT)
             MOVEMENT_DIRECTION[train] = not(MOVEMENT_DIRECTION[train])
             IMMUNITY[train] = time.time()
-            NEXT_STATION[train]=stations[0]
+            NEXT_STATION[train]=stations[1]
         else:
             NEXT_STATION[train]=stations[1]
         is_next_a_turn(train,plan=plan)

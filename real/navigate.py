@@ -70,6 +70,7 @@ def depth_first_search(fro,to,occupation,last_station):
             else:
                 neighs.append(MAP[node][0])
                 ##? i love niki !
+                
         for neigh in neighs:
             if neigh not in visited:
                 visited.add(neigh)
@@ -93,7 +94,7 @@ def depth_first_search(fro,to,occupation,last_station):
             else:
                 manual.append("stop")
 
-        if parent.get(current) is not None:
+        if parent.get(current) is not None and parent.get(parent.get(current)) is not None:
             if len(MAP[parent.get(current)]) == 3:
                 if current == MAP[parent.get(current)][0]:
                     manual.append(0)
@@ -141,12 +142,12 @@ def route(fro,to, occupation:list[str],last_station=None):
            
     direction=(0 if (MAP[fro][0] == last_station) ^ (MAP[path[0]][0] == path[1]) else 1) if len(MAP[path[0]]) == 2 else (0 if (MAP[fro][1] == last_station) ^ (MAP[path[0]][1] == path[1]) else 1)
 
-    manual.pop(0)
+    #manual.pop(0)
     
 
     return manual,direction,path
 
 
 if __name__ == "__main__":
-    print(route("fo-1","c-2",[],None))
+    print(route("fo-34","c-2",[],None))
   
