@@ -11,7 +11,7 @@ TIME_TABLES = {}    # train_id: list[str]
 DESTINATIONS = {}   # train_id: str
 AT = {}           # train_id: int
 POSITION = {0:"st1"}  # train_id: str
-TRAINS= [0,1,2] # list of train IDs eg 0 1 2 etc
+TRAINS= [] # list of train IDs eg 0 1 2 etc
 COONNECTED = False  # flag to check if the server is connected to the intelino server
 
 data_lock = threading.Lock()
@@ -22,17 +22,19 @@ def do_after_arrival(train_id, waittime):
     time.sleep(waittime)
     with data_lock:
         if waittime != 0:
-            AT[train_id] += 1
-            if AT[train_id] >= len(TIME_TABLES[train_id]):
-                AT[train_id] = 0
-        DESTINATIONS[train_id] = TIME_TABLES[train_id][AT[train_id]]
-        print(f"[AFTER] {waittime}s passed since {train_id} arrived we go to {TIME_TABLES[train_id][AT[train_id]]}")
-        requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[train_id][AT[train_id]])  # or maybe do something else
+            AT[str(train_id)] += 1
+            if int(AT[str(train_id)]) >= len(TIME_TABLES[str(train_id)]):
+                AT[str(train_id)] = 0
+        DESTINATIONS[str(train_id)] = TIME_TABLES[str(train_id)][AT[str(train_id)]]
+        print(f"[AFTER] {waittime}s passed since {train_id} arrived we go to ")
+        requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[str(train_id)][AT[str(train_id)]])  # or maybe do something else
 
 
 
 def main_loop():
+    
     while True:
+        global COONNECTED,TRAINS,POSITION,DESTINATIONS,AT
         try:
             position=requests.get("http://127.0.0.1:5080/get_positions").json()
         except:
@@ -42,27 +44,37 @@ def main_loop():
                 COONNECTED = False
             continue
         with data_lock:
-            COONNECTED = True
-            TRAINS=list(position.keys())
-            POSITION = position
-            for train_id, pos in TIME_TABLES.items():
-                if list(position.values())[int(train_id)] == DESTINATIONS[train_id]:
-                    print(f"{train_id} arrived at {list(position.values())[int(train_id)]}")
-                    if AT[train_id] == -1:
-                        continue  # skip if the train is not following a timetable
-                    AT[train_id] += 1
-                    if AT[train_id] >= len(TIME_TABLES[train_id]):
-                        AT[train_id] = 0
-                    if isinstance(TIME_TABLES[train_id][AT[train_id]], int):
-                        waittime= TIME_TABLES[train_id][AT[train_id]]
-                    else:
-                        waittime= 0
-                        #print(f"Waiting for {waittime} seconds")
             
-                    t = threading.Thread(target=do_after_arrival, args=(train_id, waittime), daemon=True)
-                    t.start()
+            COONNECTED = True
+            TRAINS=list(range(len(position.keys())))
+            c=0
+            pok=list(position.values())
+            pok.reverse()
+            for pp in pok:
+                POSITION[c] = pp
+                c+=1
+            for train_id in TRAINS:
+                try:
+                    if pok[int(train_id)] == DESTINATIONS[str(train_id)]:
+                        print(f"{train_id} arrived at {list(position.values())[int(train_id)]}")
+            
+                        if AT[str(train_id)] == -1:
+                            continue  # skip if the train is not following a timetable
+                        AT[str(train_id)] += 1
+                        if AT[str(train_id)] >= len(TIME_TABLES[str(train_id)]):
+                            AT[str(train_id)] = 0
+                        if isinstance(TIME_TABLES[str(train_id)][AT[str(train_id)]], int):
+                            waittime= TIME_TABLES[str(train_id)][AT[str(train_id)]]
+                        else:
+                            waittime= 0
+                            #print(f"Waiting for {waittime} seconds")
+                
+                        t = threading.Thread(target=do_after_arrival, args=(train_id, waittime), daemon=True)
+                        t.start()
 
-                    DESTINATIONS[train_id] =False
+                        DESTINATIONS[train_id] =False
+                except:
+                    pass
                 
         time.sleep(1)
 
@@ -75,39 +87,40 @@ def add_cors_headers(response):
 
 @app.route("/save/<save_name>/<train_id>")
 def save(save_name, train_id):
-    with data_lock:
-        try:
-            with open(f"{save_name}.json", "w") as f:
-                json.dump(TIME_TABLES[train_id], f)
-            print(f"Data saved to {save_name}.json")
-        except Exception as e:
-            print(f"Error saving data: {e}")
-            return flask.jsonify({"error": str(e)}), 500
+    global TIME_TABLES,AT,DESTINATIONS,COONNECTED
+    
+    try:
+        with open(f"{save_name}.json", "w") as f:
+            json.dump(TIME_TABLES[train_id], f)
+        print(f"Data saved to {save_name}.json")
+    except Exception as e:
+        print(f"Error saving data: {e}")
+        return flask.jsonify({"error": str(e)}), 500
     return flask.jsonify({"message": "Data saved successfully"})
         
 @app.route("/load/<save_name>/<train_id>")
 def load(save_name, train_id):
-    with data_lock:
-        try:
-            with open(f"{save_name}.json", "r") as f:    
-                TIME_TABLES[train_id] = json.load(f)
-                DESTINATIONS[train_id] = TIME_TABLES[train_id][0]
-                AT[train_id] = 0
+    global TIME_TABLES,AT,DESTINATIONS,COONNECTED
+    try:
+        with open(f"{save_name}.json", "r") as f:    
+            TIME_TABLES[train_id] = json.load(f)
+            DESTINATIONS[train_id] = TIME_TABLES[train_id][0]
+            AT[train_id] = 0
 
-                if COONNECTED:
-                    AT[train_id] += 1
-                    if isinstance(TIME_TABLES[train_id][0], int):
-                        do_after_arrival(train_id, TIME_TABLES[train_id][0])
-                    else:
-                        try:
-                            requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[train_id][AT[train_id]])
-                        except requests.exceptions.RequestException as e:
-                            AT[train_id] -= 1
-                
-            print(f"Data loaded from {save_name}.json")
-        except Exception as e:
-            print(f"Error loading data: {e}")
-            return flask.jsonify({"error": str(e)}), 500
+            if COONNECTED:
+                AT[train_id] += 1
+                if isinstance(TIME_TABLES[train_id][0], int):
+                    do_after_arrival(train_id, TIME_TABLES[train_id][0])
+                else:
+                    try:
+                        requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[train_id][AT[train_id]])
+                    except requests.exceptions.RequestException as e:
+                        AT[train_id] -= 1
+            
+        print(f"Data loaded from {save_name}.json")
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        return flask.jsonify({"error": str(e)}), 500
     return flask.jsonify({"message": "Data loaded successfully"})
 
 
@@ -116,12 +129,13 @@ def send(train_id):
     data= flask.request.get_data(as_text=True).replace("\"", '')
     if not data:
         return flask.jsonify({"message": "No data provided"}), 400
-    with data_lock:
-        DESTINATIONS[train_id] = data
-        try:
-            requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=data)
-        except requests.exceptions.RequestException as e:
-            pass
+    global TIME_TABLES,AT,DESTINATIONS,COONNECTED
+    
+    DESTINATIONS[train_id] = data
+    try:
+        requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=data)
+    except requests.exceptions.RequestException as e:
+        pass
 
     print(f"Data sent to train {train_id}: {data}")
     return flask.jsonify({"message": "Data sent successfully"})
@@ -130,27 +144,30 @@ def send(train_id):
 def toggle(train_id, onoff):
     if onoff.lower() not in ["on", "off"]:
         return flask.jsonify({"message": "Invalid toggle value"}), 400
-    with data_lock:
-        if onoff.lower() == "on":
-            AT[train_id] = 0
-            DESTINATIONS[train_id] = TIME_TABLES[train_id][0]
-            print(f"Train {train_id} toggled ON")
-        else:
-            AT[train_id] = -1
-            print(f"Train {train_id} toggled OFF")
+    global TIME_TABLES,AT,DESTINATIONS,COONNECTED
+    
+    if onoff.lower() == "on":
+        AT[train_id] = 0
+        DESTINATIONS[train_id] = TIME_TABLES[train_id][0]
+        print(f"Train {train_id} toggled ON")
+        requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[train_id][AT[train_id]])  # or maybe do something else
+
+    else:
+        AT[train_id] = -1
+        print(f"Train {train_id} toggled OFF")
     return flask.jsonify({"message": f"Train {train_id} toggled {onoff.upper()}"})
 
 @app.route("/trains", methods=["GET"])
 def get_trains():
-    with data_lock:
-        return flask.jsonify({
-            "time_tables": TIME_TABLES,
-            "step": AT,
-            "trains": TRAINS,
-            "connected": COONNECTED,
-            "destinations": DESTINATIONS,
-            "positions": POSITION
-        })
+    global TIME_TABLES,AT,DESTINATIONS,COONNECTED,POSITION
+    return flask.jsonify({
+        "time_tables": TIME_TABLES,
+        "step": AT,
+        "trains": TRAINS,
+        "connected": COONNECTED,
+        "destinations": DESTINATIONS,
+        "positions": POSITION
+    })
 
 
 @app.route("/set_plan/<train_id>", methods=["POST"])
@@ -159,20 +176,21 @@ def set_plan(train_id):
     if len(json.loads(data)) == 0:
         return flask.jsonify({"message": "No plan provided"}), 400
     print(f"Server received: {data}")
-    with data_lock:
-        DESTINATIONS[train_id] = json.loads(data)[0]
-        AT[train_id] = 0
-        TIME_TABLES[train_id] = json.loads(data)
-        print(f"Plan set for train {train_id}: {TIME_TABLES[train_id]}")
-        if COONNECTED:
-            AT[train_id] += 1
-            if isinstance(json.loads(data)[0], int):
-                do_after_arrival(train_id, json.loads(data)[0])
-            else:
-                try:
-                    requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[train_id][AT[train_id]])
-                except requests.exceptions.RequestException as e:
-                    AT[train_id] -= 1
+    global TIME_TABLES,AT,DESTINATIONS,COONNECTED
+
+    DESTINATIONS[train_id] = json.loads(data)[0]
+    AT[train_id] = 0
+    TIME_TABLES[train_id] = json.loads(data)
+    print(f"Plan set for train {train_id}: {TIME_TABLES[train_id]}")
+    if COONNECTED:
+        AT[train_id] += 1
+        if isinstance(json.loads(data)[0], int):
+            do_after_arrival(train_id, json.loads(data)[0])
+        else:
+            try:
+                requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[train_id][AT[train_id]])
+            except requests.exceptions.RequestException as e:
+                AT[train_id] -= 1
 
         
     return flask.jsonify({"message": "Plan set successfully"})

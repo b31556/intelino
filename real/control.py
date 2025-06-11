@@ -120,8 +120,7 @@ def handle_station(train,msg):
 
 def handle_color_change(train,msg):
     if msg.color == C.CYAN:
-        if time.time() - IMMUNITY[train] < 2:
-            return
+        
         global POSITION,DESTINATION,NEXT_STATION,LAST_STATTION,TRAINS_IN_WATITING_LINE
         LAST_STATTION[train]=POSITION[train]
         POSITION[train]=NEXT_STATION[train]
@@ -145,7 +144,7 @@ def handle_color_change(train,msg):
 def main():
     global trains, POSITION, LAST_STATTION, MOVEMENT_DIRECTION
 
-    train_count = 1
+    train_count = 2
     blink_delay = 0.5  # in seconds
 
     print("scanning and connecting...")
@@ -154,7 +153,7 @@ def main():
 
     print("connected train count:", len(trains_list))
 
-    posible_positions=["fo-1"]
+    posible_positions=["fo-1","fo-2"]
 
     for t in trains_list:
         #t.drive_at_speed(random.randint(30,60))
