@@ -198,6 +198,49 @@ def set_plan(train_id:int,destination:str):
         MOVEMENT_DIRECTION[train]=(MOVEMENT_DIRECTION[train] if direction==0 else not(MOVEMENT_DIRECTION[train]))
         IMMUNITY[train] = time.time()
 
+@app.route("/json")
+def json_data():
+    global POSITION, LAST_STATTION, DESTINATION, NEXT_STATION, MOVEMENT_DIRECTION
+    data = {
+        "trains": [
+            {
+                "id": train.id,
+                "alias": train.alias,
+                "position": POSITION[train],
+                "last_station": LAST_STATTION[train],
+                "destination": DESTINATION[train],
+                "next_station": NEXT_STATION[train],
+                "movement_direction": MOVEMENT_DIRECTION[train],
+                "colors": train.colors,
+                "speed": train.speed,
+                "battery": train.battery} for train in trains
+        ]
+    }
+    return flask.jsonify(data)
+
+
+@app.route('/get_plan/<train_id>', methods=['GET'])
+def get_plan(train_id):
+    global trains, DESTINATION, POSITION, LAST_STATTION, NEXT_STATION
+    train = trains[int(train_id)]
+    plan, direction, stations = navigate.route(POSITION[train], DESTINATION[train], make_occupation(train), LAST_STATTION[train])
+    if not plan:
+        plan=[]
+        direction="KYS"
+        stations=[]
+        
+    return flask.jsonify({
+        "train_id": train_id,
+        "destination": DESTINATION[train],
+        "position": POSITION[train],
+        "last_station": LAST_STATTION[train],
+        "next_station": NEXT_STATION[train],
+        "plan": stations,
+        "direction": direction,
+        "movement_direction": MOVEMENT_DIRECTION[train],
+        "commands": [str(cmd) for cmd in plan]
+    })
+
 @app.route('/set_plan/<train_id>', methods=['POST'])
 def receive_data(train_id):
     data = flask.request.get_data(as_text=True)
@@ -205,6 +248,16 @@ def receive_data(train_id):
     set_plan(int(train_id),str(data))
 
     return flask.jsonify({"message":"done"})
+
+@app.route("/graph", methods=['GET'])
+def graph():
+    if os.path.exists("intelino/real/map.json"):
+        with open("intelino/real/map.json", "r") as f:
+            map_data = json.load(f)
+    else:
+        with open("real/map.json", "r") as f:
+            map_data = json.load(f)
+    return flask.jsonify(map_data)
 
 @app.route('/get_trains', methods=['GET'])
 def get_trains():

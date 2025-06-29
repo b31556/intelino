@@ -4,6 +4,7 @@ import requests
 import threading
 import json
 import time
+import os
 
 app = flask.Flask(__name__)
 
@@ -25,8 +26,16 @@ def do_after_arrival(train_id, waittime):
             AT[str(train_id)] += 1
             if int(AT[str(train_id)]) >= len(TIME_TABLES[str(train_id)]):
                 AT[str(train_id)] = 0
-        DESTINATIONS[str(train_id)] = TIME_TABLES[str(train_id)][AT[str(train_id)]]
+        
         print(f"[AFTER] {waittime}s passed since {train_id} arrived we go to ")
+        while isinstance(TIME_TABLES[str(train_id)][AT[str(train_id)]], int):
+            print(f"Waiting for {TIME_TABLES[str(train_id)][AT[str(train_id)] - 1]} seconds")
+            time.sleep(TIME_TABLES[str(train_id)][AT[str(train_id)] - 1])
+            AT[str(train_id)] += 1
+            if int(AT[str(train_id)]) >= len(TIME_TABLES[str(train_id)]):
+                AT[str(train_id)] = 0
+        
+        DESTINATIONS[str(train_id)] = TIME_TABLES[str(train_id)][AT[str(train_id)]]
         requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[str(train_id)][AT[str(train_id)]])  # or maybe do something else
 
 
@@ -68,11 +77,13 @@ def main_loop():
                         else:
                             waittime= 0
                             #print(f"Waiting for {waittime} seconds")
+                        
+                        DESTINATIONS[str(train_id)] =False
                 
                         t = threading.Thread(target=do_after_arrival, args=(train_id, waittime), daemon=True)
                         t.start()
 
-                        DESTINATIONS[train_id] =False
+                        
                 except:
                     pass
                 
@@ -88,11 +99,12 @@ def add_cors_headers(response):
 @app.route("/save/<save_name>/<train_id>")
 def save(save_name, train_id):
     global TIME_TABLES,AT,DESTINATIONS,COONNECTED
-    
+    if not os.path.exists("saves"):
+        os.makedirs("saves")
     try:
-        with open(f"{save_name}.json", "w") as f:
+        with open(f"saves/{save_name}.json", "w") as f:
             json.dump(TIME_TABLES[train_id], f)
-        print(f"Data saved to {save_name}.json")
+        print(f"Data saved to saves/{save_name}.json")
     except Exception as e:
         print(f"Error saving data: {e}")
         return flask.jsonify({"error": str(e)}), 500
@@ -101,8 +113,10 @@ def save(save_name, train_id):
 @app.route("/load/<save_name>/<train_id>")
 def load(save_name, train_id):
     global TIME_TABLES,AT,DESTINATIONS,COONNECTED
+    if not os.path.exists(f"saves/{save_name}.json"):
+        return flask.jsonify({"error": "Save file not found"}), 404
     try:
-        with open(f"{save_name}.json", "r") as f:    
+        with open(f"saves/{save_name}.json", "r") as f:    
             TIME_TABLES[train_id] = json.load(f)
             DESTINATIONS[train_id] = TIME_TABLES[train_id][0]
             AT[train_id] = 0
@@ -117,7 +131,7 @@ def load(save_name, train_id):
                     except requests.exceptions.RequestException as e:
                         AT[train_id] -= 1
             
-        print(f"Data loaded from {save_name}.json")
+        print(f"Data loaded from saves/{save_name}.json")
     except Exception as e:
         print(f"Error loading data: {e}")
         return flask.jsonify({"error": str(e)}), 500
@@ -154,6 +168,7 @@ def toggle(train_id, onoff):
 
     else:
         AT[train_id] = -1
+        #DESTINATIONS[train_id] = False
         print(f"Train {train_id} toggled OFF")
     return flask.jsonify({"message": f"Train {train_id} toggled {onoff.upper()}"})
 
@@ -178,21 +193,10 @@ def set_plan(train_id):
     print(f"Server received: {data}")
     global TIME_TABLES,AT,DESTINATIONS,COONNECTED
 
-    DESTINATIONS[train_id] = json.loads(data)[0]
-    AT[train_id] = 0
+    
     TIME_TABLES[train_id] = json.loads(data)
     print(f"Plan set for train {train_id}: {TIME_TABLES[train_id]}")
-    if COONNECTED:
-        AT[train_id] += 1
-        if isinstance(json.loads(data)[0], int):
-            do_after_arrival(train_id, json.loads(data)[0])
-        else:
-            try:
-                requests.post(f"http://127.0.0.1:5080/set_plan/{train_id}", data=TIME_TABLES[train_id][AT[train_id]])
-            except requests.exceptions.RequestException as e:
-                AT[train_id] -= 1
-
-        
+    
     return flask.jsonify({"message": "Plan set successfully"})
 
 @app.route("/", methods=["GET"])
