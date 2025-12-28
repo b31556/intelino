@@ -24,7 +24,7 @@ demo and setup help will be on YouTube soon!
 
 ```mermaid
 graph TD
-    A[Train Sensors] --> B(mapper.py)
+    A[Train Sensors] --> B(navigate.py)
     B --> C[map.json]
     C --> D(main.py)
     D --> E[Web Server]
@@ -143,14 +143,6 @@ intelino/
 9. Commit changes (`git commit -m 'Add amazing feature'`)
 10. Push branch (`git push origin feature/amazing-feature`)
 11. Open Pull Request
-
-## Roadmap 🗺
-
-- [ ] Mobile control interface
-- [ ] Predictive maintenance alerts
-- [ ] Machine learning optimization
-- [ ] Voice command integration
-- [ ] 3D visualization mode
 
 ---
 
