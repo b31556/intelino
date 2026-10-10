@@ -150,7 +150,7 @@ def shortest_route(strttime,start, end):
 # Example usage
 import time
 t=time.time()
-stations, path, timetaken = shortest_route(341, "Deák Ferenc tér M", "Rákoscsaba-Újtelep, Tóalmás utca")
+stations, path, timetaken = shortest_route(341, "Deák Ferenc tér M", "Deák Ferenc tér M")
 print(f"took {time.time()-t} secs")
 
 print("Shortest path based on station hops:")
