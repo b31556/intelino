@@ -1,5 +1,6 @@
 import json
 import random
+import threading
 import time
 
 from intelino.trainlib import TrainScanner, Train
@@ -31,6 +32,14 @@ LAST_STATTION={} #train: str
 
 DESTINATION={} # train: str
 
+DESTINATION_GROUP={} # train: str, only while the train was sent to a station group ("fo"), DESTINATION holds the stub picked for it
+
+RESERVE_COMMITTED_NODES=True # also keep other trains off the nodes a train is committed to. False lets them pass sooner (fewer stalls in the simulation) but relies on a train always stopping on its marker
+
+COMMITTED_NODES={} # train: list[str], the nodes after NEXT_STATION the train can no longer avoid (see navigate.commit_end). Nobody else may take them and the train can't pick another way up to the last one
+
+STATE_LOCK=threading.RLock() # BLE callbacks and flask threads share the dicts above, checking a node and claiming it must be one step
+
 POSITION={} # train: str
 
 NEXT_STATION={} # train: str
@@ -46,11 +55,14 @@ trains=[]
 def process_que():
     global TRAINS_IN_WATITING_LINE
     if len(TRAINS_IN_WATITING_LINE) != 0:
-        for train in TRAINS_IN_WATITING_LINE:
-            set_plan(trains.index(train), DESTINATION[train])
+        for train in list(TRAINS_IN_WATITING_LINE):  # set_plan edits the list while we loop
+            try:
+                set_plan(trains.index(train), DESTINATION_GROUP.get(train, DESTINATION[train]))
+            except Exception as e:   # one train that can not be routed must not stop the others from retrying
+                print(f"train {train.alias} still waiting: {e}")
     else:
         return
-    
+
 
 
 def make_occupation(train):
@@ -61,7 +73,76 @@ def make_occupation(train):
     for key in NEXT_STATION:
         if key != train:
             occupation.append(NEXT_STATION[key])
+    if RESERVE_COMMITTED_NODES:
+        for key in COMMITTED_NODES:
+            if key != train:
+                occupation.extend(COMMITTED_NODES[key])
     return occupation
+
+def forced_exit_of(train):
+    """The only node (besides turning back) the train can go to first: the one it is heading to when it is between two nodes, else its committed exit"""
+    heading=NEXT_STATION.get(train)
+    committed=COMMITTED_NODES.get(train)
+    return heading if heading not in (None,POSITION[train]) else (committed[0] if committed else None)
+
+def resolve_destination(train,strict=False):
+    """For a train sent to a station group, make DESTINATION[train] a concrete free stub of it.
+    Keeps the current pick while it is still free. Returns False if the group is full right now.
+    A station that can not be reached at all raises when strict (a new plan), otherwise the train just waits."""
+    group=DESTINATION_GROUP.get(train)
+    if group is None:
+        return True
+    members=navigate.station_groups()[group]
+    if POSITION[train] in members:   # standing on a stub of the station = arrived, any stub will do
+        DESTINATION[train]=POSITION[train]
+        return True
+    occupation=make_occupation(train)
+    reserved=[DESTINATION[other] for other in DESTINATION if other != train]
+    if DESTINATION.get(train) in members and DESTINATION[train] not in occupation and DESTINATION[train] not in reserved:
+        return True
+    try:
+        pick=navigate.pick_from_group(group,POSITION[train],LAST_STATTION[train],occupation,reserved,forced_exit_of(train))
+    except Exception as e:
+        if strict:
+            raise
+        print(f"train {train.alias} at {POSITION[train]} cannot reach station {group}: {e}")
+        pick=None
+    if pick is None:
+        DESTINATION[train]=group   # nothing to route to yet, process_que retries
+        return False
+    DESTINATION[train]=pick
+    return True
+
+def wait_in_queue(train):
+    if train not in TRAINS_IN_WATITING_LINE:
+        TRAINS_IN_WATITING_LINE.append(train)
+    train.stop_driving()
+    # a train that waits only keeps what it physically sits on: the exit it already passed the split for if it stands on a switch, nothing more
+    committed=COMMITTED_NODES.get(train) or []
+    COMMITTED_NODES[train]=committed[:1] if navigate.is_switch(POSITION[train]) else []
+
+def claim(train,stations):
+    """The train starts towards stations[1]; from then on it also holds every node after it that leaves it no choice."""
+    NEXT_STATION[train]=stations[1]
+    COMMITTED_NODES[train]=navigate.committed_nodes(stations)
+
+def advance(train):
+    """Route from where the train stands now and claim its next node. Call with STATE_LOCK held.
+    Returns the switch commands to steer by, or None if the train has to wait."""
+    try:
+        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train],forced_exit_of(train))
+    except Exception as e:   # destination not reachable through the exit the train is committed to
+        print(f"train {train.alias} at {POSITION[train]} cannot reach {DESTINATION[train]}: {e}")
+        plan=False
+    if plan==False:
+        wait_in_queue(train)
+        return None
+    if direction == 1:
+        train.drive_at_speed(SPPEEEDDD,MovementDirection.INVERT)
+        MOVEMENT_DIRECTION[train] = not(MOVEMENT_DIRECTION[train])
+        IMMUNITY[train] = time.time()
+    claim(train,stations)
+    return plan
 
 def is_next_a_turn(train=None,plan=None):
     if plan is None:
@@ -84,61 +165,41 @@ def handle_station(train,msg):
     if time.time() - IMMUNITY[train] < 2:
         return
     if msg.colors[:3]==(C.WHITE,C.MAGENTA,C.WHITE) or msg.colors[:3]==(C.WHITE,C.BLACK,C.BLACK):
-        
-        LAST_STATTION[train]=POSITION[train]
-        POSITION[train]=NEXT_STATION[train]
+        with STATE_LOCK:
+            LAST_STATTION[train]=POSITION[train]
+            POSITION[train]=NEXT_STATION[train]
 
-        if POSITION[train]==DESTINATION[train]:
-            train.stop_driving()
-            return
+            plan=None
+            if not resolve_destination(train):   # sent to a station group that is full right now
+                wait_in_queue(train)
+            elif POSITION[train]==DESTINATION[train]:
+                train.stop_driving()
+                COMMITTED_NODES[train]=[]
+            else:
+                plan=advance(train)
 
-        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
-        if plan==False:
-            if train not in TRAINS_IN_WATITING_LINE:
-                TRAINS_IN_WATITING_LINE.append(train)
-            train.stop_driving()
-            return        
+        if plan:
+            is_next_a_turn(train,plan=plan)   # sleeps, so not under the lock
 
-        if direction == 1:
-            train.drive_at_speed(SPPEEEDDD,MovementDirection.INVERT)
-            MOVEMENT_DIRECTION[train] = not(MOVEMENT_DIRECTION[train])
-            IMMUNITY[train] = time.time()
-            NEXT_STATION[train]=stations[0]
-        else:
-            NEXT_STATION[train]=stations[1]
-
-        if len(plan) == 0:
-            return False
-        
-        if POSITION[train] == DESTINATION[train]:
-            train.stop_driving()
-        
-        
-        is_next_a_turn(train,plan=plan)
-
-        process_que()
+        process_que()  # we left the previous node, trains waiting on it can retry
 
 def handle_color_change(train,msg):
     if msg.color == C.CYAN:
         
         global POSITION,DESTINATION,NEXT_STATION,LAST_STATTION,TRAINS_IN_WATITING_LINE
-        LAST_STATTION[train]=POSITION[train]
-        POSITION[train]=NEXT_STATION[train]
-        plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])
-        if plan==False:
-            if train not in TRAINS_IN_WATITING_LINE:
-                TRAINS_IN_WATITING_LINE.append(train)
-            train.stop_driving()
-            return  
-        if direction == 1:
-            train.drive_at_speed(SPPEEEDDD,MovementDirection.INVERT)
-            MOVEMENT_DIRECTION[train] = not(MOVEMENT_DIRECTION[train])
-            IMMUNITY[train] = time.time()
-            NEXT_STATION[train]=stations[1]
-        else:
-            NEXT_STATION[train]=stations[1]
-        is_next_a_turn(train,plan=plan)
-         
+        with STATE_LOCK:
+            LAST_STATTION[train]=POSITION[train]
+            POSITION[train]=NEXT_STATION[train]
+
+            plan=None
+            if not resolve_destination(train):   # sent to a station group that is full right now
+                wait_in_queue(train)
+            else:
+                plan=advance(train)
+
+        if plan:
+            is_next_a_turn(train,plan=plan)
+
         process_que()
 
 def main():
@@ -177,22 +238,47 @@ def main():
         
 
 
-def set_plan(train_id:int,destination:str):
-    destination=destination.replace('"','')
-    global trains,DESTINATION,NEXT_STATION,TRAINS_IN_WATITING_LINE
-    train=trains[int(train_id)]
+def start_plan(train,train_id,destination):
+    """Everything set_plan decides and claims. Call with STATE_LOCK held. Returns (plan, direction) or None if the train does not start."""
+    global DESTINATION,NEXT_STATION,TRAINS_IN_WATITING_LINE
     if train in TRAINS_IN_WATITING_LINE:
         TRAINS_IN_WATITING_LINE.remove(train)
     DESTINATION[train] = destination
-    print(f"set plan for {train_id} from {POSITION[trains[train_id]]} to {destination}")
-    plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train])  ##### IMPLAMENT OCCUPATION
+    if destination in navigate.station_groups():
+        DESTINATION_GROUP[train] = destination
+        try:
+            resolved=resolve_destination(train,strict=True)
+        except Exception:   # nothing of this station can be reached from here, tell the caller like for a single station
+            DESTINATION_GROUP.pop(train,None)
+            raise
+        if not resolved:   # every stub of the station is taken, wait for one to free up
+            if train not in TRAINS_IN_WATITING_LINE:
+                TRAINS_IN_WATITING_LINE.append(train)
+            return None
+    else:
+        DESTINATION_GROUP.pop(train,None)
+    if POSITION[train] == DESTINATION[train]:   # already there
+        return None
+    print(f"set plan for {train_id} from {POSITION[train]} to {destination}")
+    # a train between two nodes can only go on to the node it is heading to, one standing on a node only through the exit it is committed to
+    plan,direction,stations=navigate.route(POSITION[train],DESTINATION[train],make_occupation(train),LAST_STATTION[train],forced_exit_of(train))
     if not stations:
         if train not in TRAINS_IN_WATITING_LINE:
             TRAINS_IN_WATITING_LINE.append(train)
+        return None
+    claim(train,stations)
+    return plan,direction
+
+def set_plan(train_id:int,destination:str):
+    destination=destination.replace('"','')
+    global trains
+    train=trains[int(train_id)]
+    with STATE_LOCK:
+        started=start_plan(train,train_id,destination)
+    if started is None:
         return
-        
-    NEXT_STATION[train] = stations[1]
-    is_next_a_turn(train,plan)
+    plan,direction=started
+    is_next_a_turn(train,plan)   # sleeps, so not under the lock
     if direction != "KYS":
         train.drive_at_speed(SPPEEEDDD,MovementDirection.FORWARD if (MOVEMENT_DIRECTION[train] if direction==0 else not(MOVEMENT_DIRECTION[train])) else MovementDirection.BACKWARD)
         MOVEMENT_DIRECTION[train]=(MOVEMENT_DIRECTION[train] if direction==0 else not(MOVEMENT_DIRECTION[train]))
@@ -258,6 +344,10 @@ def graph():
         with open("real/map.json", "r") as f:
             map_data = json.load(f)
     return flask.jsonify(map_data)
+
+@app.route('/groups', methods=['GET'])
+def groups():
+    return flask.jsonify(navigate.station_groups())
 
 @app.route('/get_trains', methods=['GET'])
 def get_trains():

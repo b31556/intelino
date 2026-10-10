@@ -17,6 +17,12 @@ COONNECTED = False  # flag to check if the server is connected to the intelino s
 
 data_lock = threading.Lock()
 
+GROUPS = {}  # station group -> its stubs eg "fo": ["fo-1", ...], fetched from the intelino server
+
+def is_at(position, destination):
+    """True if the train stands on the destination, or on any stub of it when the destination is a station group"""
+    return position == destination or position in GROUPS.get(destination, [])
+
 
 
 def do_after_arrival(train_id, waittime):
@@ -52,8 +58,13 @@ def main_loop():
             with data_lock:
                 COONNECTED = False
             continue
+        if not GROUPS:
+            try:
+                GROUPS.update(requests.get("http://127.0.0.1:5080/groups").json())
+            except Exception:
+                pass
         with data_lock:
-            
+
             COONNECTED = True
             TRAINS=list(range(len(position.keys())))
             c=0
@@ -64,7 +75,7 @@ def main_loop():
                 c+=1
             for train_id in TRAINS:
                 try:
-                    if pok[int(train_id)] == DESTINATIONS[str(train_id)]:
+                    if is_at(pok[int(train_id)], DESTINATIONS[str(train_id)]):
                         print(f"{train_id} arrived at {list(position.values())[int(train_id)]}")
             
                         if AT[str(train_id)] == -1:
